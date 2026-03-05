@@ -1,4 +1,4 @@
-- 👋 Hi, I’m @jubezola
+- 👋 Hi, I’m @Guilherme Pires
 - 👀 I’m interested in learn something
 - 🌱 I’m currently learning Python
 - 💞️ I’m looking to collaborate on bussines
