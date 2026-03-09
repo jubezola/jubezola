@@ -1,0 +1,39 @@
+import java.util.Scanner;
+
+public class Main {
+
+    static Scanner ler = new Scanner(System.in);
+    
+    static int num_cliente;
+    static long contribuinte_cliente, count = 0;
+    static String nome_cliente, morada_cliente;
+
+    static void add_id() {
+
+        System.out.println("Introduza o contribuinte do cliente: ");
+        contribuinte_cliente = ler.nextLong();
+
+        System.out.println("Introduza o nome completo do cliente: ");
+        nome_cliente = ler.nextLine();
+
+        System.out.println("Introduza a morada do cliente: ");
+        morada_cliente = ler.nextLine();
+
+        if (contribuinte_cliente > 100000000 && contribuinte_cliente < 999999999) {
+            count = count + 1;
+        } else {
+            do {
+                System.out.println("Insira um contribuinte valido: ");
+                contribuinte_cliente = ler.nextLong();
+            } while (contribuinte_cliente < 100000000 || contribuinte_cliente > 999999999);
+        } //chaveta do elsedoif
+
+    } //chaveta do add_id
+
+    public static void main(String[] args) {
+
+        add_id();
+
+    }
+
+}
