@@ -1,0 +1,12 @@
+{
+  "name": "LeadRadar — negócios sem website em Portugal",
+  "short_name": "LeadRadar",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F3F5FB",
+  "theme_color": "#1D3FA0",
+  "lang": "pt-PT",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
