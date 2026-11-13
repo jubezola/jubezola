@@ -36,11 +36,21 @@ Arrasta a pasta `leadradar/public` para [app.netlify.com/drop](https://app.netli
 
 ---
 
+## Publicar na Vercel
+
+1. Em [vercel.com/new](https://vercel.com/new) importa este repositório do GitHub.
+2. Não mudes nada: o `vercel.json` na raiz já diz o que publicar (`leadradar/public`, sem build). Carrega em **Deploy**.
+3. Cada push para `main` publica uma nova versão automaticamente.
+
+O envio por email (`api/send-report.mjs`) e a proteção por palavra-passe (`middleware.js`) funcionam igual ao Netlify: define `RESEND_API_KEY`, `REPORT_FROM`, `REPORT_ALLOWED_TO` e/ou `SITE_USERS` em **Project → Settings → Environment Variables** e faz **Redeploy**.
+
+---
+
 ## Para vender acessos
 
 ### Proteger o site com utilizador e palavra-passe
 
-No Netlify: **Site configuration → Environment variables → Add a variable**
+No Netlify: **Site configuration → Environment variables → Add a variable** (na Vercel: **Project → Settings → Environment Variables**)
 
 | Variável | Exemplo | Para quê |
 |---|---|---|
