@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>LeadRadar — negócios sem website em Portugal</title>
+  <meta name="description" content="Encontra cafés, oficinas, cabeleireiros e clínicas em todos os distritos de Portugal que ainda não têm website, com WhatsApp, Instagram ou telefone prontos a contactar.">
+  <meta name="theme-color" content="#1D3FA0">
+  <meta property="og:title" content="LeadRadar — negócios sem website em Portugal">
+  <meta property="og:description" content="Leads em tempo real para vender websites: WhatsApp, Instagram e telefone de negócios sem site, distrito a distrito.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="assets/vendor/leaflet/MarkerCluster.css">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <!-- Descarrega os módulos em paralelo em vez de um a um (cascata de imports). -->
+  <link rel="modulepreload" href="assets/js/app.js">
+  <link rel="modulepreload" href="assets/js/config.js">
+  <link rel="modulepreload" href="assets/js/data.js">
+  <link rel="modulepreload" href="assets/js/overpass.js">
+  <link rel="modulepreload" href="assets/js/leads.js">
+  <link rel="modulepreload" href="assets/js/store.js">
+  <link rel="modulepreload" href="assets/js/map.js">
+  <link rel="modulepreload" href="assets/js/report.js">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-wa" viewBox="0 0 24 24"><path d="M3.5 20.5l1.3-3.9A8.5 8.5 0 1 1 8 19.4l-4.5 1.1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9.2 7.9c-.3-.6-.6-.6-.9-.6h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.2 5 4.4 2.5 1 3 .8 3.5.7.6-.1 1.7-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.4l-2-1c-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.4.1-.6l.4-.5.3-.5c.1-.2 0-.4 0-.5l-.9-2.3z" fill="currentColor"/></symbol>
+      <symbol id="i-ig" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></symbol>
+      <symbol id="i-fb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-9 5.7a2 2 0 0 1-2 0L2 7"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+      <symbol id="i-google" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+      <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h0M3.5 12h0M3.5 18h0"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
+      <symbol id="i-radar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6.4-6.4"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+    </defs>
+  </svg>
+
+  <a class="skip" href="#workspace">Saltar para os resultados</a>
+
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="LeadRadar, início">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name" data-brand>LeadRadar</span>
+    </a>
+    <nav class="views" aria-label="Secções">
+      <button type="button" class="view-tab" data-view="search" aria-current="page">Procurar</button>
+      <button type="button" class="view-tab" data-view="pipeline">Pipeline <span class="count-pill" id="pipeCount">0</span><span class="count-pill is-due" id="dueCount" hidden></span></button>
+    </nav>
+    <div class="live" id="live" data-state="idle" role="status" aria-live="polite">
+      <span class="live-dot" aria-hidden="true"></span>
+      <span class="live-text" id="liveText">Pronto</span>
+    </div>
+    <button type="button" class="btn btn-report" id="openReport"><svg class="ic"><use href="#i-file"/></svg><span>Relatório geral</span></button>
+    <button type="button" class="icon-btn" id="openSettings" aria-label="Definições"><svg class="ic"><use href="#i-sliders"/></svg></button>
+  </header>
+
+  <!-- ───────────── Procurar ───────────── -->
+  <main id="view-search" class="view">
+    <section class="hero" aria-labelledby="heroTitle">
+      <div class="hero-copy">
+        <h1 id="heroTitle">Negócios sem website, com o contacto à mão.</h1>
+        <p class="hero-lede">Toca num distrito. A pesquisa corre no OpenStreetMap neste momento e devolve cafés, oficinas, cabeleireiros, clínicas e lojas que ainda não têm site — com WhatsApp, Instagram ou telefone de cada um.</p>
+        <div class="hero-actions">
+          <button type="button" class="btn btn-tram" id="scanAll"><svg class="ic"><use href="#i-radar"/></svg><span>Varrer Portugal inteiro</span></button>
+          <button type="button" class="btn btn-ghost-light" id="scanStop" hidden>Parar varredura</button>
+        </div>
+        <p class="scan-status" id="scanStatus" aria-live="polite"></p>
+        <ul class="hero-facts">
+          <li><b>20</b> distritos e regiões</li>
+          <li><b>308</b> concelhos</li>
+          <li>Dados atualizados ao minuto</li>
+        </ul>
+      </div>
+      <div class="tilemap-wrap">
+        <div class="tilemap" id="tilemap" aria-label="Distritos de Portugal"></div>
+        <p class="tilemap-note" id="tilemapNote">Os números aparecem à medida que cada distrito é analisado.</p>
+      </div>
+    </section>
+
+    <section class="workspace" id="workspace" aria-labelledby="resultsTitle">
+      <div class="ws-head">
+        <div class="ws-title">
+          <h2 id="resultsTitle">Escolhe um distrito para começar</h2>
+          <p class="ws-sub" id="resultsSub">Os resultados aparecem aqui e no mapa.</p>
+        </div>
+        <div class="ws-scope">
+          <label class="field field-inline">
+            <span class="field-label">Concelho</span>
+            <select id="concelho" disabled><option value="">Todo o distrito</option></select>
+          </label>
+          <button type="button" class="btn btn-quiet" id="refresh" disabled><svg class="ic"><use href="#i-refresh"/></svg><span>Atualizar</span></button>
+        </div>
+      </div>
+
+      <div class="filters" id="filters">
+        <div class="filter-row">
+          <label class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <input type="search" id="q" placeholder="Procurar por nome, rua ou tipo" autocomplete="off">
+          </label>
+          <label class="field">
+            <span class="sr-only">Localidade</span>
+            <select id="city"><option value="">Todas as localidades</option></select>
+          </label>
+          <label class="field">
+            <span class="sr-only">Ordenar</span>
+            <select id="sort">
+              <option value="score">Melhores primeiro</option>
+              <option value="name">Nome (A–Z)</option>
+              <option value="city">Localidade</option>
+              <option value="new">Novos primeiro</option>
+            </select>
+          </label>
+        </div>
+        <div class="filter-row">
+          <div class="seg" role="radiogroup" aria-label="Canal de contacto" id="channel">
+            <button type="button" role="radio" aria-checked="true" data-v="all">Todos</button>
+            <button type="button" role="radio" aria-checked="false" data-v="whatsapp"><svg class="ic"><use href="#i-wa"/></svg>WhatsApp</button>
+            <button type="button" role="radio" aria-checked="false" data-v="instagram"><svg class="ic"><use href="#i-ig"/></svg>Instagram</button>
+            <button type="button" role="radio" aria-checked="false" data-v="phone"><svg class="ic"><use href="#i-phone"/></svg>Só telefone</button>
+          </div>
+          <div class="heat-filter" role="group" aria-label="Temperatura" id="heat">
+            <button type="button" class="heat-chip heat-quente" aria-pressed="true" data-v="quente">Quentes</button>
+            <button type="button" class="heat-chip heat-morno" aria-pressed="true" data-v="morno">Mornos</button>
+            <button type="button" class="heat-chip heat-frio" aria-pressed="true" data-v="frio">Frios</button>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="hideTracked">
+            <span>Esconder os que já estão no pipeline</span>
+          </label>
+        </div>
+        <div class="cats" id="cats" role="group" aria-label="Categorias"></div>
+      </div>
+
+      <div class="results">
+        <div class="list-col">
+          <div class="mobile-toggle" role="tablist" aria-label="Modo de visualização">
+            <button type="button" role="tab" aria-selected="true" data-mode="list"><svg class="ic"><use href="#i-list"/></svg>Lista</button>
+            <button type="button" role="tab" aria-selected="false" data-mode="map"><svg class="ic"><use href="#i-map"/></svg>Mapa</button>
+          </div>
+          <div class="summary" id="summary" hidden></div>
+          <ol class="lead-list" id="leadList" aria-live="polite"></ol>
+          <div class="empty" id="empty">
+            <div class="empty-tiles" aria-hidden="true"><span></span><span></span><span></span></div>
+            <p class="empty-title">Ainda sem pesquisa</p>
+            <p>Escolhe um distrito no mapa de azulejos acima, ou varre o país inteiro de uma vez.</p>
+          </div>
+          <button type="button" class="btn btn-quiet more" id="more" hidden>Mostrar mais</button>
+        </div>
+        <aside class="map-col" aria-label="Mapa e atividade">
+          <div class="map-frame"><div id="map" role="region" aria-label="Mapa dos resultados"></div></div>
+          <section class="feed" aria-labelledby="feedTitle">
+            <h3 id="feedTitle">Atividade ao vivo</h3>
+            <ol class="feed-list" id="feed"></ol>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <section class="howto" aria-labelledby="howTitle">
+      <h2 id="howTitle">Do mapa à venda em três passos</h2>
+      <ol class="steps">
+        <li>
+          <h3>Escolhe a zona</h3>
+          <p>Distrito ou concelho. Aparecem negócios sem website — ou que só têm Facebook, Instagram ou um site do Google já desativado — e com forma de contacto.</p>
+        </li>
+        <li>
+          <h3>Contacta com um toque</h3>
+          <p>O WhatsApp abre com a mensagem já escrita com o nome do negócio. No Instagram, a mensagem fica copiada para colares no Direct.</p>
+        </li>
+        <li>
+          <h3>Acompanha até fechar</h3>
+          <p>Cada contacto entra no pipeline com seguimento marcado para 3 dias depois. Marca quem respondeu, regista o valor e tira o relatório geral quando quiseres.</p>
+        </li>
+      </ol>
+      <p class="howto-note">Antes de contactar, confirma no Google: alguns negócios têm site que ainda não foi adicionado ao OpenStreetMap. O botão <b>Verificar</b> em cada lead faz essa pesquisa.</p>
+    </section>
+  </main>
+
+  <!-- ───────────── Pipeline ───────────── -->
+  <main id="view-pipeline" class="view" hidden>
+    <section class="pipe-head">
+      <div>
+        <h2>Pipeline de vendas</h2>
+        <p class="ws-sub">Arrasta os negócios entre colunas, ou muda o estado na ficha de cada um.</p>
+      </div>
+      <button type="button" class="btn btn-quiet due-toggle" id="pipeDue" aria-pressed="false">Seguimentos para hoje</button>
+      <label class="search">
+        <svg class="ic"><use href="#i-search"/></svg>
+        <input type="search" id="pipeQ" placeholder="Procurar no pipeline" autocomplete="off">
+      </label>
+    </section>
+    <dl class="kpis" id="kpis"></dl>
+    <div class="board" id="board"></div>
+  </main>
+
+  <footer class="footer">
+    <p>Dados de negócios © colaboradores do <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>, licença ODbL, consultados em tempo real através da Overpass API.</p>
+    <p class="footer-legal">Usa os contactos de forma responsável: identifica-te, oferece uma forma simples de recusar e respeita quem não quiser ser contactado (RGPD).</p>
+    <p id="supportLine"></p>
+  </footer>
+
+  <!-- ───────────── Ficha do lead ───────────── -->
+  <dialog class="sheet" id="leadDialog" aria-labelledby="ldName">
+    <form method="dialog" class="sheet-inner" id="leadForm">
+      <header class="sheet-head">
+        <div>
+          <p class="sheet-kicker" id="ldType"></p>
+          <h2 id="ldName"></h2>
+          <p class="sheet-sub" id="ldAddr"></p>
+        </div>
+        <div class="sheet-tools">
+          <div class="ld-nav" id="ldNav" hidden>
+            <button type="button" class="icon-btn" id="ldPrev" aria-label="Negócio anterior" title="Anterior (←)"><svg class="ic flip"><use href="#i-chev"/></svg></button>
+            <span class="ld-pos" id="ldPos"></span>
+            <button type="button" class="btn btn-quiet btn-sm" id="ldNext" title="Seguinte (→)">Seguinte<svg class="ic"><use href="#i-chev"/></svg></button>
+          </div>
+          <button class="icon-btn" value="close" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+        </div>
+      </header>
+      <div class="sheet-body">
+        <div class="ld-contacts" id="ldContacts"></div>
+        <div class="ld-reasons" id="ldReasons"></div>
+
+        <fieldset class="ld-block">
+          <legend>Mensagem</legend>
+          <div class="ld-template">
+            <select id="ldTemplate" aria-label="Modelo de mensagem"></select>
+            <button type="button" class="btn btn-quiet btn-sm" id="ldCopy"><svg class="ic"><use href="#i-copy"/></svg>Copiar</button>
+          </div>
+          <textarea id="ldMessage" rows="5"></textarea>
+          <div class="ld-send" id="ldSend"></div>
+        </fieldset>
+
+        <fieldset class="ld-block">
+          <legend>Estado no pipeline</legend>
+          <div class="stage-picker" id="ldStages" role="radiogroup" aria-label="Estado"></div>
+          <div class="ld-row">
+            <label class="field">
+              <span class="field-label">Valor da proposta (€)</span>
+              <input type="number" id="ldValue" min="0" step="10" inputmode="numeric">
+            </label>
+            <button type="button" class="btn btn-quiet btn-sm" id="ldRemove">Tirar do pipeline</button>
+          </div>
+          <div class="ld-row">
+            <label class="field">
+              <span class="field-label">Próximo contacto</span>
+              <input type="date" id="ldFollow">
+            </label>
+            <div class="quick-days" id="ldFollowQuick" role="group" aria-label="Marcar seguimento">
+              <button type="button" class="btn btn-quiet btn-sm" data-days="1">Amanhã</button>
+              <button type="button" class="btn btn-quiet btn-sm" data-days="3">3 dias</button>
+              <button type="button" class="btn btn-quiet btn-sm" data-days="7">1 semana</button>
+            </div>
+          </div>
+          <label class="field">
+            <span class="field-label">Notas</span>
+            <textarea id="ldNote" rows="3" placeholder="Ex.: falar com a dona depois das 15h"></textarea>
+          </label>
+        </fieldset>
+
+        <div class="ld-links" id="ldLinks"></div>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ───────────── Relatório ───────────── -->
+  <dialog class="sheet" id="reportDialog" aria-labelledby="rpTitle">
+    <form method="dialog" class="sheet-inner" id="reportForm">
+      <header class="sheet-head">
+        <div>
+          <h2 id="rpTitle">Relatório geral</h2>
+          <p class="sheet-sub">Tudo num só documento: leads por distrito e categoria, os melhores para contactar primeiro e o estado do teu pipeline.</p>
+        </div>
+        <button class="icon-btn" value="close" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+      </header>
+      <div class="sheet-body">
+        <fieldset class="ld-block">
+          <legend>O que incluir</legend>
+          <div class="scope-list" id="rpScope"></div>
+          <div class="rp-missing" id="rpMissing" hidden></div>
+          <label class="switch"><input type="checkbox" id="rpFull" checked><span>Incluir a lista completa de negócios no PDF</span></label>
+        </fieldset>
+        <dl class="rp-preview" id="rpPreview"></dl>
+        <fieldset class="ld-block">
+          <legend>Descarregar</legend>
+          <div class="rp-actions">
+            <button type="button" class="btn btn-primary" data-rp="pdf"><svg class="ic"><use href="#i-file"/></svg>PDF</button>
+            <button type="button" class="btn btn-quiet" data-rp="xlsx">Excel</button>
+            <button type="button" class="btn btn-quiet" data-rp="csv">CSV</button>
+          </div>
+        </fieldset>
+        <fieldset class="ld-block">
+          <legend>Receber</legend>
+          <div class="rp-email">
+            <label class="field">
+              <span class="field-label">Email</span>
+              <input type="email" id="rpEmail" placeholder="o-teu@email.pt" autocomplete="email">
+            </label>
+            <button type="button" class="btn btn-primary" data-rp="email"><svg class="ic"><use href="#i-send"/></svg>Enviar por email</button>
+          </div>
+          <button type="button" class="btn btn-wa" data-rp="whatsapp"><svg class="ic"><use href="#i-wa"/></svg>Enviar resumo para o meu WhatsApp</button>
+          <p class="hint" id="rpHint"></p>
+        </fieldset>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ───────────── Definições ───────────── -->
+  <dialog class="sheet" id="settingsDialog" aria-labelledby="stTitle">
+    <form method="dialog" class="sheet-inner" id="settingsForm">
+      <header class="sheet-head">
+        <div>
+          <h2 id="stTitle">Definições</h2>
+          <p class="sheet-sub">Ficam guardadas neste browser.</p>
+        </div>
+        <button class="icon-btn" value="close" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+      </header>
+      <div class="sheet-body">
+        <fieldset class="ld-block">
+          <legend>Sobre ti</legend>
+          <div class="grid-2">
+            <label class="field"><span class="field-label">O teu nome (vai nas mensagens)</span><input id="stName" autocomplete="name"></label>
+            <label class="field"><span class="field-label">Preço base de um site (€)</span><input id="stPrice" type="number" min="0" step="10" inputmode="numeric"></label>
+            <label class="field"><span class="field-label">O teu WhatsApp (para o resumo)</span><input id="stPhone" type="tel" placeholder="+351 9xx xxx xxx" autocomplete="tel"></label>
+            <label class="field"><span class="field-label">Email para relatórios</span><input id="stEmail" type="email" autocomplete="email"></label>
+          </div>
+        </fieldset>
+        <fieldset class="ld-block">
+          <legend>Mensagens</legend>
+          <div class="grid-2">
+            <label class="field"><span class="field-label">Modelo para WhatsApp</span><select id="stTplWa"></select></label>
+            <label class="field"><span class="field-label">Modelo para Instagram</span><select id="stTplIg"></select></label>
+          </div>
+          <label class="field">
+            <span class="field-label">Editar modelo</span>
+            <select id="stTplEdit"></select>
+          </label>
+          <textarea id="stTplText" rows="5"></textarea>
+          <label class="field"><span class="field-label">WhatsApp no computador</span>
+            <select id="stWaDesktop">
+              <option value="web">WhatsApp Web, sempre no mesmo separador</option>
+              <option value="app">Página wa.me (abre a app instalada)</option>
+            </select>
+          </label>
+          <p class="hint">Variáveis: {nome} {cidade} {categoria} {meu_nome} {preco} {saudacao}. <button type="button" class="link-btn" id="stTplReset">Repor o texto original</button></p>
+        </fieldset>
+        <fieldset class="ld-block">
+          <legend>Pesquisa</legend>
+          <div class="grid-2">
+            <label class="field"><span class="field-label">Máximo de negócios por pesquisa</span><input id="stMax" type="number" min="100" max="10000" step="100"></label>
+            <label class="field"><span class="field-label">Atualização automática</span>
+              <select id="stRefresh">
+                <option value="0">Desligada</option>
+                <option value="5">A cada 5 minutos</option>
+                <option value="10">A cada 10 minutos</option>
+                <option value="30">A cada 30 minutos</option>
+                <option value="60">A cada hora</option>
+              </select>
+            </label>
+          </div>
+          <label class="switch"><input type="checkbox" id="stChains"><span>Excluir cadeias e franchisings</span></label>
+          <label class="switch"><input type="checkbox" id="stNoSite" checked><span>Mostrar só negócios sem website</span></label>
+        </fieldset>
+        <fieldset class="ld-block">
+          <legend>Dados</legend>
+          <div class="rp-actions">
+            <button type="button" class="btn btn-quiet btn-sm" id="stExport">Exportar cópia do pipeline</button>
+            <label class="btn btn-quiet btn-sm file-btn">Importar cópia<input type="file" id="stImport" accept="application/json"></label>
+            <button type="button" class="btn btn-quiet btn-sm" id="stClear">Limpar resultados guardados</button>
+          </div>
+        </fieldset>
+      </div>
+      <footer class="sheet-foot">
+        <button type="button" class="btn btn-primary" id="stSave">Guardar definições</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="assets/vendor/leaflet/leaflet.js" defer></script>
+  <script src="assets/vendor/leaflet/leaflet.markercluster.js" defer></script>
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>
