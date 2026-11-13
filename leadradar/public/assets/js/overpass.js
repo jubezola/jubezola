@@ -3,6 +3,9 @@ import { CONFIG } from "./config.js";
 
 const CONTACT_KEYS = "^(phone|mobile|contact:phone|contact:mobile|contact:whatsapp|whatsapp|contact:instagram|instagram)$";
 const NO_SITE = '[!"website"][!"contact:website"][!"url"][!"contact:url"][!"website:menu"]';
+// "Sites" que não são sites: só redes sociais, agregadores de links ou páginas do Google
+// Business Profile (*.business.site), desativadas pela Google em 2024. São ótimos leads.
+export const PSEUDO_SITE_RE = "facebook[.]com|fb[.]com|fb[.]me|instagram[.]com|linktr[.]ee|linkin[.]bio|wa[.]me|business[.]site|negocio[.]site|tiktok[.]com|beacons[.]ai";
 
 const SOURCES = [
   '["shop"]["shop"!~"^(vacant|no|disused)$"]',
@@ -27,7 +30,7 @@ const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
  * @param {boolean} [o.useBbox] usa a caixa do distrito em vez da área oficial
  */
 export function buildQuery({ district, concelho, onlyNoSite = true, excludeChains = true, limit = 2500, useBbox = false }) {
-  const filters = `["name"]${onlyNoSite ? NO_SITE : ""}${excludeChains ? '[!"brand"][!"brand:wikidata"]' : ""}[~"${CONTACT_KEYS}"~"."]`;
+  const filters = `["name"]${excludeChains ? '[!"brand"][!"brand:wikidata"]' : ""}[~"${CONTACT_KEYS}"~"."]`;
   let head;
   let scope;
   if (useBbox) {
@@ -45,7 +48,11 @@ export function buildQuery({ district, concelho, onlyNoSite = true, excludeChain
     scope = "(area.a)";
   }
   const body = SOURCES.map((src) => `  nwr${src}${filters}${scope};`).join("\n");
-  return `[out:json][timeout:120];\n${head}(\n${body}\n);\nout center qt ${Math.max(50, Math.min(10000, limit | 0))};`;
+  const out = `out center qt ${Math.max(50, Math.min(10000, limit | 0))};`;
+  if (!onlyNoSite) return `[out:json][timeout:120];\n${head}(\n${body}\n);\n${out}`;
+  // Sem website OU com "website" que é só uma rede social / página desativada.
+  const site = (k) => `  nwr.c["${k}"~"${PSEUDO_SITE_RE}",i]${NO_SITE.replace(`[!"${k}"]`, "")};`;
+  return `[out:json][timeout:120];\n${head}(\n${body}\n)->.c;\n(\n  nwr.c${NO_SITE};\n${site("website")}\n${site("contact:website")}\n${site("url")}\n);\n${out}`;
 }
 
 let endpointIndex = 0;

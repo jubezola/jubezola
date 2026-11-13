@@ -41,7 +41,13 @@ export function getEntry(id) { return crm[id] || null; }
 export function updateEntry(lead, patch) {
   const prev = crm[lead.id] || { status: "guardado", note: "", value: null, created: Date.now() };
   const next = { ...prev, ...patch, updated: Date.now(), lead: slimLead(lead) };
-  if (patch.status === "contactado" && !prev.contactedAt) next.contactedAt = Date.now();
+  if (patch.status === "contactado" && !prev.contactedAt) {
+    next.contactedAt = Date.now();
+    // Seguimento automático daqui a 3 dias, se ainda não houver data marcada.
+    if (!("followUp" in patch) && !prev.followUp) next.followUp = dayKey(Date.now() + 3 * 86400000);
+  }
+  // Fechado ou perdido: já não há seguimento a fazer.
+  if (["fechado", "perdido"].includes(next.status) && !("followUp" in patch)) next.followUp = null;
   crm[lead.id] = next;
   lsSet("crm", crm);
   broadcast({ type: "crm", id: lead.id, status: next.status, name: lead.name });
@@ -52,11 +58,45 @@ export function removeEntry(id) {
   lsSet("crm", crm);
   broadcast({ type: "crm", id, status: null });
 }
-export function reloadCrm() { crm = lsGet("crm", {}); return crm; }
+export function reloadCrm() { crm = lsGet("crm", {}); blocked = lsGet("blocked", {}); return crm; }
+
+/** "AAAA-MM-DD" na hora local. */
+export function dayKey(t = Date.now()) {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+/** Entradas do pipeline com seguimento para hoje ou atrasado. */
+export function dueEntries() {
+  const today = dayKey();
+  return Object.values(crm).filter((e) => e.followUp && e.followUp <= today && !["fechado", "perdido"].includes(e.status));
+}
+
+// ── Lista "não contactar" (RGPD): negócios que pediram para não ser contactados ──
+// blocked[id] = { name, phones: [e164], at }
+let blocked = lsGet("blocked", {});
+export function getBlocked() { return blocked; }
+export function isBlocked(lead) {
+  if (blocked[lead.id]) return true;
+  const ph = new Set((lead.phones || []).map((p) => p.e164));
+  if (!ph.size) return false;
+  return Object.values(blocked).some((b) => b.phones?.some((p) => ph.has(p)));
+}
+export function block(lead) {
+  blocked[lead.id] = { name: lead.name, phones: (lead.phones || []).map((p) => p.e164), at: Date.now() };
+  lsSet("blocked", blocked);
+  if (crm[lead.id]) { delete crm[lead.id]; lsSet("crm", crm); }
+  broadcast({ type: "crm", id: lead.id, status: null, name: lead.name });
+}
+export function unblock(id) {
+  delete blocked[id];
+  lsSet("blocked", blocked);
+  broadcast({ type: "crm", id, status: null });
+}
+export function setBlocked(map) { blocked = { ...blocked, ...map }; lsSet("blocked", blocked); }
 
 function slimLead(l) {
-  const { id, osm, name, cat, type, district, street, postcode, city, lat, lon, phones, whatsapp, instagram, facebook, email, hasWebsite, hours, score, heat, reasons, concelho } = l;
-  return { id, osm, name, cat, type, district, street, postcode, city, lat, lon, phones, whatsapp, instagram, facebook, email, hasWebsite, hours, score, heat, reasons, concelho };
+  const { id, osm, name, cat, type, district, street, postcode, city, lat, lon, phones, whatsapp, instagram, facebook, email, hasWebsite, site, siteUrl, hours, score, heat, reasons, concelho } = l;
+  return { id, osm, name, cat, type, district, street, postcode, city, lat, lon, phones, whatsapp, instagram, facebook, email, hasWebsite, site, siteUrl, hours, score, heat, reasons, concelho };
 }
 
 // ── Cache de resultados em IndexedDB (sem limite de 5 MB do localStorage) ──

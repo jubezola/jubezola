@@ -7,7 +7,11 @@ Ferramenta para encontrar **negócios sem website** em todos os distritos de Por
 - **Varredura nacional**: um botão analisa o país inteiro, distrito a distrito.
 - **Contacto com um toque**: o WhatsApp abre com a mensagem já escrita com o nome do negócio; no Instagram a mensagem fica copiada para o Direct; telemóvel e fixo com botão de ligar.
 - **Pontuação de cada lead** (quente, morno, frio) conforme o canal de contacto, a atividade no Instagram, o horário publicado e o tipo de negócio.
+- **Mais leads do que "sem website"**: também apanha negócios cujo "site" é só uma página de Facebook/Instagram/Linktree, ou um site do Google (`*.business.site`) que a Google desligou em 2024. Estes aparecem destacados a amarelo.
+- **Sem duplicados**: o mesmo negócio registado duas vezes no OpenStreetMap (ponto + edifício) aparece uma só vez, com os contactos juntos.
 - **Pipeline de vendas** (Guardado → Contactado → Interessado → Fechado / Perdido) com notas, valor da proposta, receita e taxa de resposta.
+- **Seguimentos**: ao contactar alguém, fica marcado um seguimento para daqui a 3 dias (podes mudar: amanhã, 3 dias, 1 semana ou outra data). O separador Pipeline mostra quantos tens para hoje.
+- **Lista "não contactar" (RGPD)**: na ficha, "Pediu para não ser contactado" esconde o negócio de todas as pesquisas e relatórios, mesmo que volte a aparecer com outro registo do mesmo telefone.
 - **Relatório geral**: PDF, Excel (5 folhas), CSV, envio por email e resumo para o teu WhatsApp.
 - Mapa com agrupamento de marcadores, modo escuro, funciona em telemóvel, sem login nem base de dados.
 
@@ -73,7 +77,7 @@ Sem configuração, o botão **Enviar por email** descarrega o Excel e abre o pr
 ## Como funciona por dentro
 
 - 100% estático (HTML, CSS e JavaScript), sem build. As bibliotecas (Leaflet, jsPDF, SheetJS) estão em `public/assets/vendor`, não dependem de CDNs.
-- Os negócios vêm do **OpenStreetMap** através da Overpass API. A pesquisa pede negócios com nome, **sem** `website`/`url`, e **com** pelo menos um telefone, WhatsApp ou Instagram. Exclui cadeias (tag `brand`) e entidades públicas (Juntas, Centros de Saúde, escolas, etc.).
+- Os negócios vêm do **OpenStreetMap** através da Overpass API. A pesquisa pede negócios com nome, **sem** `website`/`url` (ou com um `website` que é só rede social ou `business.site`), e **com** pelo menos um telefone, WhatsApp ou Instagram. Exclui cadeias (tag `brand`) e entidades públicas (Juntas, Centros de Saúde, escolas, etc.).
 - Telemóveis portugueses (91, 92, 93, 96) recebem botão de WhatsApp; fixos recebem botão de ligar.
 - Se um servidor Overpass estiver ocupado, a ferramenta tenta automaticamente outro (lista em `config.js`).
 - O pipeline, as definições e os resultados ficam guardados **no browser de cada utilizador** (localStorage e IndexedDB). Em **Definições → Exportar cópia do pipeline** dá para passar tudo para outro computador.

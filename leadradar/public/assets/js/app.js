@@ -1,7 +1,7 @@
 import { CONFIG, TEMPLATES, PIPELINE_STAGES } from "./config.js";
 import { DISTRICTS, DISTRICT_BY_ID, CATEGORIES, CATEGORY_BY_ID } from "./data.js";
 import { fetchLeads } from "./overpass.js";
-import { toLead, fillTemplate, whatsappLink, mapsLink, googleCheckLink, heatLabel, parsePhone } from "./leads.js";
+import { toLead, dedupeLeads, fillTemplate, whatsappLink, mapsLink, googleCheckLink, heatLabel, parsePhone } from "./leads.js";
 import * as store from "./store.js";
 import * as M from "./map.js";
 import * as R from "./report.js";
@@ -77,6 +77,13 @@ function setLive(s, text) {
 }
 
 function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).catch(() => legacyCopy(text));
+    return true;
+  }
+  return legacyCopy(text);
+}
+function legacyCopy(text) {
   let ok = false;
   try {
     const ta = document.createElement("textarea");
@@ -88,8 +95,25 @@ function copyText(text) {
     ok = document.execCommand("copy");
     ta.remove();
   } catch { ok = false; }
-  if (!ok && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
-  return true;
+  return ok;
+}
+
+// ─────────────────────────── datas ───────────────────────────
+const DAY = 86400000;
+function daysAgo(t) {
+  const d = Math.floor((new Date(store.dayKey()) - new Date(store.dayKey(t))) / DAY);
+  return d <= 0 ? "hoje" : d === 1 ? "ontem" : `há ${d} dias`;
+}
+function followLabel(key) {
+  if (!key) return "";
+  const today = store.dayKey();
+  if (key === today) return "Seguimento hoje";
+  if (key < today) {
+    const d = Math.round((new Date(today) - new Date(key)) / DAY);
+    return `Seguimento atrasado ${d} dia${d > 1 ? "s" : ""}`;
+  }
+  const d = new Date(key + "T12:00");
+  return `Seguimento ${d.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })}`;
 }
 
 // ─────────────────────────── modelos de mensagem ───────────────────────────
@@ -175,7 +199,7 @@ function processElements(elements, district, concelho, approximate) {
     if (concelho) l.concelho = concelho;
     map.set(l.id, l);
   }
-  let leads = [...map.values()];
+  let leads = dedupeLeads([...map.values()]);
   if (concelho && approximate) {
     const c = norm(concelho);
     leads = leads.filter((l) => norm(l.city).includes(c) || norm(l.street).includes(c));
@@ -318,6 +342,7 @@ function selectDistrict(id, { concelho = "", scroll = false, force = false, upda
 
 // ─────────────────────────── filtros e listagem ───────────────────────────
 function passesBase(l, f, crm) {
+  if (store.isBlocked(l)) return false;
   if (f.channel === "whatsapp" && !l.whatsapp) return false;
   if (f.channel === "instagram" && !l.instagram) return false;
   if (f.channel === "phone" && (l.whatsapp || l.instagram || !l.phones.length)) return false;
@@ -378,14 +403,15 @@ function leadRow(l, crm) {
   const phone = l.phones[0];
   const where = [l.street, l.city].filter(Boolean).join(", ");
   const tagNew = state.newIds.has(l.id) ? `<span class="tag-new">Novo</span>` : "";
-  const tagStage = entry ? `<span class="tag-stage">${esc(stageLabel(entry.status))}</span>` : "";
+  const ago = entry?.contactedAt && entry.status !== "guardado" ? `, ${daysAgo(entry.contactedAt)}` : "";
+  const tagStage = entry ? `<span class="tag-stage">${esc(stageLabel(entry.status))}${esc(ago)}</span>` : "";
   const wa = l.whatsapp
     ? `<a class="act act-wa" data-act="wa" href="${esc(whatsappLink(l, messageFor(l, waTemplate(l))))}" target="_blank" rel="noopener">${icon("wa")}WhatsApp</a>` : "";
   const ig = l.instagram
     ? `<a class="act act-ig" data-act="ig" href="https://instagram.com/${esc(l.instagram)}" target="_blank" rel="noopener" title="Copia a mensagem e abre o perfil">${icon("ig")}@${esc(l.instagram)}</a>` : "";
   const call = phone
     ? `<a class="act act-phone" data-act="call" href="tel:${esc(phone.e164)}">${icon("phone")}${esc(phone.display.replace("+351 ", ""))}</a>` : "";
-  const reasons = l.reasons.map((r) => `<span class="reason${r === "Já tem website" ? " is-bad" : ""}">${esc(r)}</span>`).join("");
+  const reasons = l.reasons.map((r, i) => `<span class="reason${r === "Já tem website" ? " is-bad" : i === 0 && l.site && l.site !== "none" ? " is-hot" : ""}">${esc(r)}</span>`).join("");
   return `<li class="lead heat-${l.heat}${state.newIds.has(l.id) ? " is-new" : ""}" data-id="${l.id}">
     <span class="lead-bar" aria-hidden="true"></span>
     <div class="lead-main">
@@ -527,6 +553,11 @@ function refreshAfterCrm() {
 
 function updatePipeCount() {
   $("#pipeCount").textContent = Object.keys(store.getCrm()).length;
+  const due = store.dueEntries().length;
+  const b = $("#dueCount");
+  b.hidden = !due;
+  b.textContent = due;
+  b.title = `${due} seguimento${due === 1 ? "" : "s"} para hoje`;
 }
 
 // ─────────────────────────── ficha do lead ───────────────────────────
@@ -562,13 +593,27 @@ function openLead(lead) {
   $("#ldValue").value = entry?.value ?? "";
   $("#ldValue").placeholder = String(state.settings.sitePrice || "");
   $("#ldNote").value = entry?.note || "";
+  $("#ldFollow").value = entry?.followUp || "";
+  $("#ldFollow").min = store.dayKey();
   $("#ldRemove").hidden = !entry;
 
   $("#ldLinks").innerHTML = `
     <a href="${esc(googleCheckLink(lead, d?.name))}" target="_blank" rel="noopener">${icon("google")}Verificar no Google</a>
     <a href="${esc(mapsLink(lead))}" target="_blank" rel="noopener">${icon("pin")}Abrir no Google Maps</a>
+    ${lead.siteUrl ? `<a href="${esc(/^https?:/i.test(lead.siteUrl) ? lead.siteUrl : "https://" + lead.siteUrl)}" target="_blank" rel="noopener">${icon("google")}${lead.site === "dead" ? "Ver o site antigo (desativado)" : "Ver a página que usa como site"}</a>` : ""}
     <a href="https://www.openstreetmap.org/${esc(lead.osm)}" target="_blank" rel="noopener">${icon("map")}Ver no OpenStreetMap</a>
-    <button type="button" class="link-btn" id="ldHasSite">Já tem website: descartar</button>`;
+    <button type="button" class="link-btn" id="ldHasSite">Já tem website: descartar</button>
+    <button type="button" class="link-btn is-danger" id="ldBlock">Pediu para não ser contactado</button>`;
+  $("#ldBlock").addEventListener("click", () => {
+    store.block(lead);
+    feed(`Na lista "não contactar": ${lead.name}`);
+    refreshAfterCrm();
+    state.current = null;
+    dlg.close();
+    toast(`${lead.name} não volta a aparecer nas pesquisas nem nos relatórios.`, {
+      action: { label: "Desfazer", fn: () => { store.unblock(lead.id); refreshAfterCrm(); } },
+    });
+  });
   $("#ldHasSite").addEventListener("click", () => {
     store.updateEntry(lead, { status: "perdido", note: [store.getEntry(lead.id)?.note, "Já tem website."].filter(Boolean).join(" ") });
     feed(`Descartado (já tem site): ${lead.name}`);
@@ -610,6 +655,7 @@ function bindLeadDialog() {
     if (a.dataset.ld === "ig") { copyText($("#ldMessage").value); toast(`Mensagem copiada. Cola-a no Direct de @${lead.instagram}.`); }
     markContacted(lead, { wa: "WhatsApp", ig: "Instagram", mail: "email", call: "telefone" }[a.dataset.ld]);
     renderStages(store.getEntry(lead.id)?.status);
+    $("#ldFollow").value = store.getEntry(lead.id)?.followUp || "";
     $("#ldRemove").hidden = false;
   });
   $("#ldContacts").addEventListener("click", (e) => {
@@ -621,6 +667,7 @@ function bindLeadDialog() {
     const lead = state.current;
     store.updateEntry(lead, { status: b.dataset.stage });
     renderStages(b.dataset.stage);
+    $("#ldFollow").value = store.getEntry(lead.id)?.followUp || "";
     $("#ldRemove").hidden = false;
     feed(`${lead.name}: ${stageLabel(b.dataset.stage)}`, b.dataset.stage === "fechado" ? "good" : "");
     if (b.dataset.stage === "fechado") toast(`Venda fechada: ${lead.name}`);
@@ -640,6 +687,20 @@ function bindLeadDialog() {
   };
   $("#ldNote").addEventListener("input", () => { clearTimeout(noteTimer); noteTimer = setTimeout(saveDetails, 500); });
   $("#ldValue").addEventListener("change", saveDetails);
+  $("#ldFollow").addEventListener("change", (e) => {
+    const lead = state.current;
+    const entry = store.getEntry(lead.id);
+    store.updateEntry(lead, { followUp: e.target.value || null, status: entry?.status || "guardado" });
+    if (!entry) renderStages("guardado");
+    $("#ldRemove").hidden = false;
+    refreshAfterCrm();
+  });
+  $("#ldFollowQuick").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-days]");
+    if (!b) return;
+    $("#ldFollow").value = store.dayKey(Date.now() + Number(b.dataset.days) * DAY);
+    $("#ldFollow").dispatchEvent(new Event("change"));
+  });
   $("#ldRemove").addEventListener("click", () => {
     store.removeEntry(state.current.id);
     renderStages(null);
@@ -650,7 +711,7 @@ function bindLeadDialog() {
   });
   dlg.addEventListener("close", () => {
     clearTimeout(noteTimer);
-    if (state.current) saveDetails();
+    if (state.current && !store.isBlocked(state.current)) saveDetails();
     refreshAfterCrm();
   });
 }
@@ -659,7 +720,11 @@ function bindLeadDialog() {
 function renderPipeline() {
   const crm = store.getCrm();
   const q = norm($("#pipeQ").value);
-  const entries = Object.entries(crm).map(([id, e]) => ({ id, ...e })).filter((e) => e.lead && (!q || norm(`${e.lead.name} ${e.lead.city} ${e.note}`).includes(q)));
+  const onlyDue = $("#pipeDue").getAttribute("aria-pressed") === "true";
+  const dueIds = new Set(store.dueEntries().map((e) => e.lead?.id));
+  const entries = Object.entries(crm).map(([id, e]) => ({ id, ...e }))
+    .filter((e) => e.lead && (!q || norm(`${e.lead.name} ${e.lead.city} ${e.note}`).includes(q)) && (!onlyDue || dueIds.has(e.id)));
+  $("#pipeDue").textContent = `Seguimentos para hoje (${dueIds.size})`;
   const all = Object.values(crm);
   const contacted = all.filter((e) => e.status !== "guardado").length;
   const positive = all.filter((e) => ["interessado", "fechado"].includes(e.status)).length;
@@ -668,13 +733,14 @@ function renderPipeline() {
   const revenue = closed.reduce((s, e) => s + (Number(e.value) || price), 0);
   const potential = all.filter((e) => e.status === "interessado").reduce((s, e) => s + (Number(e.value) || price), 0);
   $("#kpis").innerHTML = [
-    ["Acompanhados", n(all.length)], ["Contactados", n(contacted)],
+    ["Seguimentos hoje", n(dueIds.size)], ["Contactados", n(contacted)],
     ["Resposta positiva", contacted ? Math.round((positive / contacted) * 100) + "%" : "—"],
     ["Em negociação", eur(potential)], ["Fechados", n(closed.length)], ["Receita", eur(revenue)],
   ].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
 
   $("#board").innerHTML = PIPELINE_STAGES.map((s) => {
-    const items = entries.filter((e) => e.status === s.id).sort((a, b) => b.updated - a.updated);
+    const items = entries.filter((e) => e.status === s.id)
+      .sort((a, b) => Number(dueIds.has(b.id)) - Number(dueIds.has(a.id)) || (a.followUp || "9").localeCompare(b.followUp || "9") || b.updated - a.updated);
     return `<section class="col" data-stage="${s.id}" aria-label="${esc(s.label)}">
       <header class="col-head"><span>${esc(s.label)}</span><small>${items.length}</small></header>
       ${items.map((e) => pipelineCard(e)).join("") || `<p class="col-empty">${s.id === "guardado" ? "Usa a estrela num lead para o guardar aqui." : "Arrasta para aqui."}</p>`}
@@ -691,6 +757,7 @@ function pipelineCard(e) {
   return `<article class="pcard" draggable="true" data-id="${esc(e.id)}">
     <button type="button" class="pcard-name" data-pact="open">${esc(l.name)}</button>
     <p class="pcard-meta">${esc(l.type)}, ${esc(l.city || d?.name || "")}${e.value ? ` <span class="pcard-value">${eur(e.value)}</span>` : ""}</p>
+    ${e.followUp && !["fechado", "perdido"].includes(e.status) ? `<p class="pcard-follow${e.followUp <= store.dayKey() ? " is-due" : ""}">${esc(followLabel(e.followUp))}</p>` : ""}
     ${e.note ? `<p class="pcard-note">${esc(e.note)}</p>` : ""}
     <div class="pcard-foot">${wa}${ig}${ph}
       <select aria-label="Mudar estado" data-pact="stage">${PIPELINE_STAGES.map((s) => `<option value="${s.id}" ${s.id === e.status ? "selected" : ""}>${esc(s.label)}</option>`).join("")}</select>
@@ -747,6 +814,11 @@ function bindPipeline() {
     renderPipeline();
   });
   $("#pipeQ").addEventListener("input", renderPipeline);
+  $("#pipeDue").addEventListener("click", (e) => {
+    const b = e.currentTarget;
+    b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+    renderPipeline();
+  });
 }
 
 function setView(view) {
@@ -836,12 +908,12 @@ const rpData = { all: null, current: null, pipeline: null };
 async function openReport() {
   const dlg = $("#reportDialog");
   const { leads, districts } = await allCachedLeads();
-  rpData.all = leads;
+  rpData.all = leads.filter((l) => !store.isBlocked(l));
   rpData.current = state.district ? filtered().list : [];
   rpData.pipeline = Object.values(store.getCrm()).map((e) => e.lead).filter(Boolean);
   const d = DISTRICT_BY_ID[state.district];
   const scopes = [
-    ["all", "Tudo o que já foi pesquisado", `${n(leads.length)} negócios em ${districts.size} distrito${districts.size === 1 ? "" : "s"}`],
+    ["all", "Tudo o que já foi pesquisado", `${n(rpData.all.length)} negócios em ${districts.size} distrito${districts.size === 1 ? "" : "s"}`],
     ["current", "Só a pesquisa atual, com os filtros", d ? `${n(rpData.current.length)} negócios em ${state.concelho || d.name}` : "Ainda não há pesquisa aberta"],
     ["pipeline", "Só o pipeline", `${n(rpData.pipeline.length)} negócios acompanhados`],
   ];
@@ -978,7 +1050,7 @@ function bindSettings() {
     if (state.district) changedQuery ? runSearch({ force: prevMax !== state.settings.maxResults }) : render();
   });
   $("#stExport").addEventListener("click", () => {
-    const data = { app: "leadradar", version: 1, exportedAt: new Date().toISOString(), crm: store.getCrm(), settings: state.settings };
+    const data = { app: "leadradar", version: 1, exportedAt: new Date().toISOString(), crm: store.getCrm(), blocked: store.getBlocked(), settings: state.settings };
     R.downloadBlob(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }), `leadradar-pipeline-${new Date().toISOString().slice(0, 10)}.json`);
   });
   $("#stImport").addEventListener("change", async (e) => {
@@ -993,6 +1065,7 @@ function bindSettings() {
         const cur = store.getEntry(id);
         if (!cur || (entry.updated || 0) > (cur.updated || 0)) { store.updateEntry(entry.lead, { ...entry, lead: undefined }); count++; }
       }
+      if (data.blocked && typeof data.blocked === "object") store.setBlocked(data.blocked);
       toast(`${count} negócio${count === 1 ? "" : "s"} importado${count === 1 ? "" : "s"} para o pipeline`);
       refreshAfterCrm();
     } catch (err) {
@@ -1150,6 +1223,11 @@ async function init() {
   const { d, c } = readHash();
   if (d && DISTRICT_BY_ID[d]) selectDistrict(d, { concelho: c, updateHash: false });
   else feed("Pronto. Escolhe um distrito ou varre Portugal inteiro.");
+
+  const due = store.dueEntries().length;
+  if (due) setTimeout(() => toast(`Tens ${due} seguimento${due > 1 ? "s" : ""} para hoje.`, {
+    action: { label: "Ver", fn: () => { $("#pipeDue").setAttribute("aria-pressed", "true"); setView("pipeline"); } }, timeout: 9000,
+  }), 800);
 
   if (!state.settings.sellerName && !store.getUi("hintedName", false)) {
     store.setUi("hintedName", true);

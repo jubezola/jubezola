@@ -76,6 +76,7 @@ function leadRow(l) {
     "Instagram": l.instagram ? "@" + l.instagram : "",
     "Telefones": (l.phones || []).map((p) => p.display).join(" / "),
     "Email": l.email || "",
+    "Site atual": l.site === "dead" ? `Desativado (${l.siteUrl})` : l.site === "social" ? `Só rede social (${l.siteUrl})` : "",
     "Facebook": l.facebook || "",
     "Horário": l.hours || "",
     "Pontuação": l.score,

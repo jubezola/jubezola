@@ -51,7 +51,7 @@
     </a>
     <nav class="views" aria-label="Secções">
       <button type="button" class="view-tab" data-view="search" aria-current="page">Procurar</button>
-      <button type="button" class="view-tab" data-view="pipeline">Pipeline <span class="count-pill" id="pipeCount">0</span></button>
+      <button type="button" class="view-tab" data-view="pipeline">Pipeline <span class="count-pill" id="pipeCount">0</span><span class="count-pill is-due" id="dueCount" hidden></span></button>
     </nav>
     <div class="live" id="live" data-state="idle" role="status" aria-live="polite">
       <span class="live-dot" aria-hidden="true"></span>
@@ -169,7 +169,7 @@
       <ol class="steps">
         <li>
           <h3>Escolhe a zona</h3>
-          <p>Distrito ou concelho. Só aparecem negócios sem website registado e com forma de contacto.</p>
+          <p>Distrito ou concelho. Aparecem negócios sem website — ou que só têm Facebook, Instagram ou um site do Google já desativado — e com forma de contacto.</p>
         </li>
         <li>
           <h3>Contacta com um toque</h3>
@@ -177,7 +177,7 @@
         </li>
         <li>
           <h3>Acompanha até fechar</h3>
-          <p>Cada contacto entra no pipeline. Marca quem respondeu, regista o valor e tira o relatório geral quando quiseres.</p>
+          <p>Cada contacto entra no pipeline com seguimento marcado para 3 dias depois. Marca quem respondeu, regista o valor e tira o relatório geral quando quiseres.</p>
         </li>
       </ol>
       <p class="howto-note">Antes de contactar, confirma no Google: alguns negócios têm site que ainda não foi adicionado ao OpenStreetMap. O botão <b>Verificar</b> em cada lead faz essa pesquisa.</p>
@@ -191,6 +191,7 @@
         <h2>Pipeline de vendas</h2>
         <p class="ws-sub">Arrasta os negócios entre colunas, ou muda o estado na ficha de cada um.</p>
       </div>
+      <button type="button" class="btn btn-quiet due-toggle" id="pipeDue" aria-pressed="false">Seguimentos para hoje</button>
       <label class="search">
         <svg class="ic"><use href="#i-search"/></svg>
         <input type="search" id="pipeQ" placeholder="Procurar no pipeline" autocomplete="off">
@@ -240,6 +241,17 @@
               <input type="number" id="ldValue" min="0" step="10" inputmode="numeric">
             </label>
             <button type="button" class="btn btn-quiet btn-sm" id="ldRemove">Tirar do pipeline</button>
+          </div>
+          <div class="ld-row">
+            <label class="field">
+              <span class="field-label">Próximo contacto</span>
+              <input type="date" id="ldFollow">
+            </label>
+            <div class="quick-days" id="ldFollowQuick" role="group" aria-label="Marcar seguimento">
+              <button type="button" class="btn btn-quiet btn-sm" data-days="1">Amanhã</button>
+              <button type="button" class="btn btn-quiet btn-sm" data-days="3">3 dias</button>
+              <button type="button" class="btn btn-quiet btn-sm" data-days="7">1 semana</button>
+            </div>
           </div>
           <label class="field">
             <span class="field-label">Notas</span>

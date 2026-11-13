@@ -233,7 +233,7 @@ p { margin: 0; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .field-inline { min-width: 220px; }
 .field-label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
-select, input[type="text"], input[type="search"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea {
+select, input[type="text"], input[type="search"], input[type="email"], input[type="tel"], input[type="number"], input[type="date"], input:not([type]), textarea {
   min-height: 42px; padding: 8px 12px; border-radius: var(--radius-m);
   border: 1px solid var(--line); background: var(--paper); font-size: 15px; width: 100%;
 }
@@ -566,3 +566,15 @@ dialog.sheet[open] { animation: rise .2s ease-out; }
   .tile.is-scanning::after { display: none; }
   .tile.is-scanning { box-shadow: inset 0 0 0 3px var(--tram); }
 }
+
+/* ── Seguimentos, sites falsos e lista "não contactar" ── */
+.count-pill.is-due { margin-left: 4px; background: var(--tram); color: var(--tram-ink); }
+.reason.is-hot { background: var(--tram); color: var(--tram-ink); border-color: transparent; font-weight: 650; }
+.link-btn.is-danger { color: var(--danger); }
+.quick-days { display: flex; gap: 6px; flex-wrap: wrap; }
+.pcard-follow { font-size: 12.5px; font-weight: 650; color: var(--ink-2); margin-top: 4px; }
+.pcard-follow.is-due { color: var(--tram-ink); background: var(--tram); display: inline-block; padding: 1px 7px; border-radius: 3px; }
+.due-toggle[aria-pressed="true"] { background: var(--tram); color: var(--tram-ink); border-color: transparent; }
+.pipe-head .due-toggle { margin-left: auto; }
+.pcard-foot { flex-wrap: wrap; }
+.pcard-foot select { min-width: 0; max-width: 100%; }
