@@ -17,6 +17,15 @@
   <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="assets/vendor/leaflet/MarkerCluster.css">
   <link rel="stylesheet" href="assets/css/app.css">
+  <!-- Descarrega os módulos em paralelo em vez de um a um (cascata de imports). -->
+  <link rel="modulepreload" href="assets/js/app.js">
+  <link rel="modulepreload" href="assets/js/config.js">
+  <link rel="modulepreload" href="assets/js/data.js">
+  <link rel="modulepreload" href="assets/js/overpass.js">
+  <link rel="modulepreload" href="assets/js/leads.js">
+  <link rel="modulepreload" href="assets/js/store.js">
+  <link rel="modulepreload" href="assets/js/map.js">
+  <link rel="modulepreload" href="assets/js/report.js">
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -38,6 +47,7 @@
       <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></symbol>
       <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h0M3.5 12h0M3.5 18h0"/></symbol>
       <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></symbol>
       <symbol id="i-radar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6.4-6.4"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
     </defs>
   </svg>
@@ -216,7 +226,14 @@
           <h2 id="ldName"></h2>
           <p class="sheet-sub" id="ldAddr"></p>
         </div>
-        <button class="icon-btn" value="close" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+        <div class="sheet-tools">
+          <div class="ld-nav" id="ldNav" hidden>
+            <button type="button" class="icon-btn" id="ldPrev" aria-label="Negócio anterior" title="Anterior (←)"><svg class="ic flip"><use href="#i-chev"/></svg></button>
+            <span class="ld-pos" id="ldPos"></span>
+            <button type="button" class="btn btn-quiet btn-sm" id="ldNext" title="Seguinte (→)">Seguinte<svg class="ic"><use href="#i-chev"/></svg></button>
+          </div>
+          <button class="icon-btn" value="close" aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+        </div>
       </header>
       <div class="sheet-body">
         <div class="ld-contacts" id="ldContacts"></div>
@@ -337,7 +354,13 @@
             <select id="stTplEdit"></select>
           </label>
           <textarea id="stTplText" rows="5"></textarea>
-          <p class="hint">Variáveis: {nome} {cidade} {categoria} {meu_nome} {preco}. <button type="button" class="link-btn" id="stTplReset">Repor o texto original</button></p>
+          <label class="field"><span class="field-label">WhatsApp no computador</span>
+            <select id="stWaDesktop">
+              <option value="web">WhatsApp Web, sempre no mesmo separador</option>
+              <option value="app">Página wa.me (abre a app instalada)</option>
+            </select>
+          </label>
+          <p class="hint">Variáveis: {nome} {cidade} {categoria} {meu_nome} {preco} {saudacao}. <button type="button" class="link-btn" id="stTplReset">Repor o texto original</button></p>
         </fieldset>
         <fieldset class="ld-block">
           <legend>Pesquisa</legend>

@@ -5,7 +5,8 @@ let map = null;
 let cluster = null;
 let overview = null;
 let tiles = null;
-const markers = new Map();
+let markers = new Map();   // id -> marker visível no cluster
+const pool = new Map();    // id -> { m, ikey, lead } (marcadores reutilizados entre renderizações)
 let onPick = null;
 let popupBuilder = null;
 
@@ -76,21 +77,43 @@ function iconFor(heat, saved) {
   return icons[key];
 }
 
+/**
+ * Mostra os leads no mapa. Em vez de apagar e recriar tudo a cada filtro,
+ * reaproveita os marcadores: só adiciona os que entram, tira os que saem
+ * e muda o ícone dos que mudaram de estado.
+ */
 export function setLeads(leads, { fit = true, savedIds = new Set() } = {}) {
   if (!map) return;
   const L = window.L;
-  cluster.clearLayers();
-  overview.clearLayers();
-  markers.clear();
-  const list = leads.map((l) => {
-    const m = L.marker([l.lat, l.lon], { icon: iconFor(l.heat, savedIds.has(l.id)), title: l.name, keyboard: false });
-    m.bindPopup(() => popupBuilder(l), { maxWidth: 260, minWidth: 200 });
-    m.on("click", () => onPick?.(l, { fromMap: true }));
-    markers.set(l.id, m);
-    return m;
-  });
-  cluster.addLayers(list);
-  if (list.length) lastBounds = L.latLngBounds(leads.map((l) => [l.lat, l.lon])).pad(0.08);
+  if (overviewOn) { overview.clearLayers(); overviewOn = false; }
+  const next = new Map();
+  const toAdd = [];
+  let s = 90, w = 180, n = -90, e = -180;
+  for (const l of leads) {
+    const saved = savedIds.has(l.id);
+    const ikey = l.heat + (saved ? "s" : "");
+    let rec = pool.get(l.id);
+    if (!rec) {
+      rec = { m: L.marker([l.lat, l.lon], { icon: iconFor(l.heat, saved), title: l.name, keyboard: false }), ikey, lead: l };
+      rec.m.bindPopup(() => popupBuilder(rec.lead), { maxWidth: 260, minWidth: 200 });
+      rec.m.on("click", () => onPick?.(rec.lead, { fromMap: true }));
+      pool.set(l.id, rec);
+    } else {
+      rec.lead = l;
+      if (rec.ikey !== ikey) { rec.ikey = ikey; rec.m.setIcon(iconFor(l.heat, saved)); }
+    }
+    next.set(l.id, rec.m);
+    if (!markers.has(l.id)) toAdd.push(rec.m);
+    if (l.lat < s) s = l.lat; if (l.lat > n) n = l.lat; if (l.lon < w) w = l.lon; if (l.lon > e) e = l.lon;
+  }
+  const toRemove = [];
+  for (const [id, m] of markers) if (!next.has(id)) toRemove.push(m);
+  if (toRemove.length) cluster.removeLayers(toRemove);
+  if (toAdd.length) cluster.addLayers(toAdd);
+  markers = next;
+  // Evita que a memória cresça sem fim depois de muitas pesquisas.
+  if (pool.size > 15000) for (const id of pool.keys()) if (!next.has(id)) pool.delete(id);
+  if (leads.length) lastBounds = L.latLngBounds([s, w], [n, e]).pad(0.08);
   if (fit && lastBounds) map.fitBounds(lastBounds, { maxZoom: 14, animate: false });
 }
 
@@ -100,12 +123,14 @@ export function focusDistrict(d) {
   map.fitBounds([[s, w], [n, e]], { animate: false });
 }
 
+let overviewOn = false;
 export function showOverview(stats) {
   if (!map) return;
   const L = window.L;
   cluster.clearLayers();
   overview.clearLayers();
-  markers.clear();
+  markers = new Map();
+  overviewOn = true;
   const max = Math.max(1, ...Object.values(stats).map((s) => s.total || 0));
   for (const d of DISTRICTS) {
     const s = stats[d.id];

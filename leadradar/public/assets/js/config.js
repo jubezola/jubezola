@@ -19,6 +19,7 @@ export const CONFIG = {
     onlyNoSite: true,          // mostrar só negócios sem website
     template: "primeiro",      // modelo de mensagem para WhatsApp
     templateIg: "instagram",   // modelo de mensagem para Instagram
+    waDesktop: "web",          // no computador: "web" (WhatsApp Web, sempre no mesmo separador) ou "app" (wa.me)
   },
 
   // Servidores públicos da Overpass API (dados do OpenStreetMap, atualizados ao minuto).
@@ -37,7 +38,7 @@ export const CONFIG = {
   emailEndpoint: "/api/send-report",
 };
 
-// Modelos de mensagem. Variáveis: {nome} {cidade} {categoria} {meu_nome} {preco}
+// Modelos de mensagem. Variáveis: {nome} {cidade} {categoria} {meu_nome} {preco} {saudacao}
 export const TEMPLATES = {
   primeiro: {
     label: "Primeiro contacto",
@@ -45,7 +46,7 @@ export const TEMPLATES = {
   },
   preco: {
     label: "Com preço",
-    text: "Olá, bom dia! Daqui fala {meu_nome}. Crio websites para negócios de {cidade} e vi que {nome} ainda não tem site próprio no Google. Consigo pôr o vosso online numa semana, a partir de {preco}€, com domínio, alojamento e Google Maps incluídos. Quer ver uma proposta?",
+    text: "{saudacao}! Daqui fala {meu_nome}. Crio websites para negócios de {cidade} e vi que {nome} ainda não tem site próprio no Google. Consigo pôr o vosso online numa semana, a partir de {preco}€, com domínio, alojamento e Google Maps incluídos. Quer ver uma proposta?",
   },
   instagram: {
     label: "Para quem já está no Instagram",

@@ -19,6 +19,9 @@ const sleep = (ms, signal) => new Promise((r) => { const t = setTimeout(r, ms); 
 const reduceMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 const icon = (id, cls = "ic") => `<svg class="${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 const PAGE = 60;
+const collator = new Intl.Collator("pt", { sensitivity: "base" });  // muito mais rápido do que localeCompare repetido
+const cmp = (a, b) => collator.compare(a, b);
+const isDesktop = () => window.matchMedia?.("(pointer: fine)").matches && window.innerWidth > 900;
 
 // ─────────────────────────── estado ───────────────────────────
 const state = {
@@ -130,8 +133,21 @@ function igTemplate() {
   return state.settings.templateIg || "instagram";
 }
 function enrich(lead) {
+  if (lead._hay) return lead;
   lead.districtName = DISTRICT_BY_ID[lead.district]?.name;
+  // Campos normalizados calculados uma vez, em vez de a cada tecla nos filtros.
+  lead._city = norm(lead.city);
+  lead._hay = norm(`${lead.name} ${lead.street} ${lead.city} ${lead.type} ${lead.postcode}`);
   return lead;
+}
+/** Cópia enriquecida de um lead guardado no pipeline (não mexe no objeto guardado). */
+const enrichCopy = (l) => enrich({ ...l });
+
+// ── WhatsApp: no computador abre o WhatsApp Web, sempre no mesmo separador ──
+function waMode() { return isDesktop() && (state.settings.waDesktop || "web") === "web" ? "web" : "app"; }
+function waAttrs(lead, msg) {
+  const mode = waMode();
+  return `href="${esc(whatsappLink(lead, msg, mode))}" target="${mode === "web" ? "leadradar-whatsapp" : "_blank"}" rel="noopener"`;
 }
 
 // ─────────────────────────── mapa de azulejos ───────────────────────────
@@ -341,30 +357,27 @@ function selectDistrict(id, { concelho = "", scroll = false, force = false, upda
 }
 
 // ─────────────────────────── filtros e listagem ───────────────────────────
-function passesBase(l, f, crm) {
-  if (store.isBlocked(l)) return false;
+function passesBase(l, f, crm, words) {
   if (f.channel === "whatsapp" && !l.whatsapp) return false;
   if (f.channel === "instagram" && !l.instagram) return false;
   if (f.channel === "phone" && (l.whatsapp || l.instagram || !l.phones.length)) return false;
   if (!f.heat.has(l.heat)) return false;
   if (f.hideTracked && crm[l.id]) return false;
-  if (f.city && norm(l.city) !== f.city) return false;
-  if (f.q) {
-    const hay = norm(`${l.name} ${l.street} ${l.city} ${l.type} ${l.postcode}`);
-    if (!f.q.split(/\s+/).every((w) => hay.includes(w))) return false;
-  }
-  return true;
+  if (f.city && l._city !== f.city) return false;
+  if (words) for (const w of words) if (!l._hay.includes(w)) return false;
+  return !store.isBlocked(l);
 }
 
 function filtered() {
   const f = state.filters;
   const crm = store.getCrm();
-  const base = state.leads.filter((l) => passesBase(l, f, crm));
+  const words = f.q ? f.q.split(/\s+/).filter(Boolean) : null;
+  const base = state.leads.filter((l) => passesBase(l, f, crm, words));
   const list = f.cats.size ? base.filter((l) => f.cats.has(l.cat)) : base;
   const by = {
-    score: (a, b) => b.score - a.score || a.name.localeCompare(b.name, "pt"),
-    name: (a, b) => a.name.localeCompare(b.name, "pt"),
-    city: (a, b) => (a.city || "~").localeCompare(b.city || "~", "pt") || b.score - a.score,
+    score: (a, b) => b.score - a.score || cmp(a.name, b.name),
+    name: (a, b) => cmp(a.name, b.name),
+    city: (a, b) => cmp(a.city || "~", b.city || "~") || b.score - a.score,
     new: (a, b) => Number(state.newIds.has(b.id)) - Number(state.newIds.has(a.id)) || b.score - a.score,
   }[f.sort] || ((a, b) => b.score - a.score);
   list.sort(by);
@@ -380,11 +393,15 @@ function renderCats(base) {
     CATEGORIES.map((c) => `<button type="button" class="cat" data-cat="${c.id}" aria-pressed="${f.cats.has(c.id)}" ${counts[c.id] ? "" : "disabled"}>${esc(c.short)} <small>${n(counts[c.id] || 0)}</small></button>`).join("");
 }
 
+let citiesFor = null;
 function renderCities() {
+  // Só reconstrói a lista de localidades quando os resultados mudam, não a cada filtro.
+  if (citiesFor === state.leads) { $("#city").value = state.filters.city; return; }
+  citiesFor = state.leads;
   const counts = new Map();
   for (const l of state.leads) {
     if (!l.city) continue;
-    const k = norm(l.city);
+    const k = l._city;
     const e = counts.get(k) || { label: l.city, n: 0 };
     e.n++;
     counts.set(k, e);
@@ -406,7 +423,7 @@ function leadRow(l, crm) {
   const ago = entry?.contactedAt && entry.status !== "guardado" ? `, ${daysAgo(entry.contactedAt)}` : "";
   const tagStage = entry ? `<span class="tag-stage">${esc(stageLabel(entry.status))}${esc(ago)}</span>` : "";
   const wa = l.whatsapp
-    ? `<a class="act act-wa" data-act="wa" href="${esc(whatsappLink(l, messageFor(l, waTemplate(l))))}" target="_blank" rel="noopener">${icon("wa")}WhatsApp</a>` : "";
+    ? `<a class="act act-wa" data-act="wa" ${waAttrs(l, messageFor(l, waTemplate(l)))}>${icon("wa")}WhatsApp</a>` : "";
   const ig = l.instagram
     ? `<a class="act act-ig" data-act="ig" href="https://instagram.com/${esc(l.instagram)}" target="_blank" rel="noopener" title="Copia a mensagem e abre o perfil">${icon("ig")}@${esc(l.instagram)}</a>` : "";
   const call = phone
@@ -492,8 +509,26 @@ function clearFilters() {
   $("#q").value = "";
   $("#hideTracked").checked = false;
   syncFilterControls();
+  saveFilters();
   state.page = 1;
   render();
+}
+
+function saveFilters() {
+  const f = state.filters;
+  store.setUi("filters", { channel: f.channel, heat: [...f.heat], sort: f.sort, hideTracked: f.hideTracked });
+}
+function loadFilters() {
+  const saved = store.getUi("filters", null);
+  if (!saved) return;
+  const f = state.filters;
+  if (["all", "whatsapp", "instagram", "phone"].includes(saved.channel)) f.channel = saved.channel;
+  if (Array.isArray(saved.heat) && saved.heat.length) f.heat = new Set(saved.heat.filter((h) => ["quente", "morno", "frio"].includes(h)));
+  if (["score", "name", "city", "new"].includes(saved.sort)) f.sort = saved.sort;
+  f.hideTracked = Boolean(saved.hideTracked);
+  $("#sort").value = f.sort;
+  $("#hideTracked").checked = f.hideTracked;
+  syncFilterControls();
 }
 
 function syncFilterControls() {
@@ -503,7 +538,9 @@ function syncFilterControls() {
 
 // ─────────────────────────── ações nos leads ───────────────────────────
 function findLead(id) {
-  return state.byId.get(id) || store.getEntry(id)?.lead || null;
+  if (state.byId.has(id)) return state.byId.get(id);
+  const l = store.getEntry(id)?.lead;
+  return l ? enrichCopy(l) : null;
 }
 
 function markContacted(lead, how) {
@@ -534,7 +571,7 @@ function handleLeadAction(act, lead, e) {
     case "wa": markContacted(lead, "WhatsApp"); break;
     case "ig": copyText(messageFor(lead, igTemplate())); toast(`Mensagem copiada. Cola-a no Direct de @${lead.instagram}.`); markContacted(lead, "Instagram"); break;
     case "call": markContacted(lead, "telefone"); break;
-    case "open": e?.preventDefault(); openLead(lead); break;
+    case "open": e?.preventDefault(); openLead(lead, { nav: state.district ? filtered().list.map((x) => x.id) : null }); break;
     case "save": e?.preventDefault(); toggleSave(lead); break;
     case "map":
       e?.preventDefault();
@@ -561,7 +598,24 @@ function updatePipeCount() {
 }
 
 // ─────────────────────────── ficha do lead ───────────────────────────
-function openLead(lead) {
+// Navegação na ficha: percorre a lista que estava visível quando a ficha foi aberta.
+function navInfo() {
+  const ids = state.nav || [];
+  const i = state.current ? ids.indexOf(state.current.id) : -1;
+  return { ids, i };
+}
+function renderNav() {
+  const { ids, i } = navInfo();
+  const on = i >= 0 && ids.length > 1;
+  $("#ldNav").hidden = !on;
+  if (!on) return;
+  $("#ldPos").textContent = `${n(i + 1)} de ${n(ids.length)}`;
+  $("#ldPrev").disabled = i <= 0;
+  $("#ldNext").disabled = i >= ids.length - 1;
+}
+
+function openLead(lead, { nav } = {}) {
+  if (nav !== undefined) state.nav = nav;
   state.current = lead;
   const dlg = $("#leadDialog");
   const cat = CATEGORY_BY_ID[lead.cat];
@@ -620,6 +674,7 @@ function openLead(lead) {
     refreshAfterCrm();
     dlg.close();
   });
+  renderNav();
   if (!dlg.open) dlg.showModal();
 }
 
@@ -628,7 +683,7 @@ function renderLeadSend() {
   if (!lead) return;
   const msg = $("#ldMessage").value;
   const parts = [];
-  if (lead.whatsapp) parts.push(`<a class="btn btn-wa" data-ld="wa" href="${esc(whatsappLink(lead, msg))}" target="_blank" rel="noopener">${icon("wa")}Enviar por WhatsApp</a>`);
+  if (lead.whatsapp) parts.push(`<a class="btn btn-wa" data-ld="wa" ${waAttrs(lead, msg)}>${icon("wa")}Enviar por WhatsApp</a>`);
   if (lead.instagram) parts.push(`<a class="btn btn-quiet" data-ld="ig" href="https://instagram.com/${esc(lead.instagram)}" target="_blank" rel="noopener">${icon("ig")}Copiar e abrir Instagram</a>`);
   if (lead.email) parts.push(`<a class="btn btn-quiet" data-ld="mail" href="mailto:${esc(lead.email)}?subject=${encodeURIComponent("Website para " + lead.name)}&body=${encodeURIComponent(msg)}">${icon("mail")}Enviar email</a>`);
   if (!lead.whatsapp && lead.phones[0]) parts.push(`<a class="btn btn-quiet" data-ld="call" href="tel:${esc(lead.phones[0].e164)}">${icon("phone")}Ligar ${esc(lead.phones[0].display)}</a>`);
@@ -657,6 +712,8 @@ function bindLeadDialog() {
     renderStages(store.getEntry(lead.id)?.status);
     $("#ldFollow").value = store.getEntry(lead.id)?.followUp || "";
     $("#ldRemove").hidden = false;
+    // Contactado: o foco passa para "Seguinte", para seguir para o próximo com Enter.
+    if (!$("#ldNav").hidden && !$("#ldNext").disabled) setTimeout(() => $("#ldNext").focus(), 0);
   });
   $("#ldContacts").addEventListener("click", (e) => {
     if (e.target.closest('[data-ld="call"]')) { markContacted(state.current, "telefone"); renderStages(store.getEntry(state.current.id)?.status); }
@@ -686,6 +743,22 @@ function bindLeadDialog() {
     updatePipeCount();
   };
   $("#ldNote").addEventListener("input", () => { clearTimeout(noteTimer); noteTimer = setTimeout(saveDetails, 500); });
+  const go = (dir) => {
+    const { ids, i } = navInfo();
+    const id = ids[i + dir];
+    if (i < 0 || !id) return;
+    clearTimeout(noteTimer);
+    if (state.current && !store.isBlocked(state.current)) saveDetails();
+    const next = findLead(id);
+    if (next) { openLead(next); $("#leadDialog .sheet-body").scrollTop = 0; }
+  };
+  $("#ldPrev").addEventListener("click", () => go(-1));
+  $("#ldNext").addEventListener("click", () => go(1));
+  dlg.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea, select") || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
+  });
   $("#ldValue").addEventListener("change", saveDetails);
   $("#ldFollow").addEventListener("change", (e) => {
     const lead = state.current;
@@ -751,7 +824,7 @@ function renderPipeline() {
 function pipelineCard(e) {
   const l = e.lead;
   const d = DISTRICT_BY_ID[l.district];
-  const wa = l.whatsapp ? `<a class="act act-wa" href="${esc(whatsappLink(l, messageFor(enrich({ ...l }), e.status === "guardado" ? waTemplate(l) : "seguimento")))}" target="_blank" rel="noopener" data-pact="wa">${icon("wa")}</a>` : "";
+  const wa = l.whatsapp ? `<a class="act act-wa" ${waAttrs(l, messageFor(enrichCopy(l), e.status === "guardado" ? waTemplate(l) : "seguimento"))} data-pact="wa">${icon("wa")}</a>` : "";
   const ph = l.phones?.[0] ? `<a class="act" href="tel:${esc(l.phones[0].e164)}" aria-label="Ligar">${icon("phone")}</a>` : "";
   const ig = l.instagram ? `<a class="act act-ig" href="https://instagram.com/${esc(l.instagram)}" target="_blank" rel="noopener" aria-label="Instagram">${icon("ig")}</a>` : "";
   return `<article class="pcard" draggable="true" data-id="${esc(e.id)}">
@@ -771,7 +844,7 @@ function bindPipeline() {
     const card = ev.target.closest(".pcard");
     if (!card) return;
     const entry = store.getEntry(card.dataset.id);
-    if (ev.target.closest('[data-pact="open"]')) openLead(enrich({ ...entry.lead }));
+    if (ev.target.closest('[data-pact="open"]')) openLead(enrichCopy(entry.lead), { nav: $$("#board .pcard").map((c) => c.dataset.id) });
     if (ev.target.closest('[data-pact="wa"]') && entry.status === "guardado") { store.updateEntry(entry.lead, { status: "contactado" }); renderPipeline(); }
   });
   board.addEventListener("change", (ev) => {
@@ -813,7 +886,8 @@ function bindPipeline() {
     refreshAfterCrm();
     renderPipeline();
   });
-  $("#pipeQ").addEventListener("input", renderPipeline);
+  let pqTimer;
+  $("#pipeQ").addEventListener("input", () => { clearTimeout(pqTimer); pqTimer = setTimeout(renderPipeline, 150); });
   $("#pipeDue").addEventListener("click", (e) => {
     const b = e.currentTarget;
     b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
@@ -935,7 +1009,7 @@ async function openReport() {
 function currentReport() {
   const scope = $('#rpScope input[name="scope"]:checked')?.value || "all";
   $("#reportForm").dataset.scope = scope;
-  const leads = (rpData[scope] || []).map(enrich);
+  const leads = (rpData[scope] || []).map(enrichCopy);
   const d = DISTRICT_BY_ID[state.district];
   const label = { all: "Todos os distritos pesquisados", current: d ? `Pesquisa em ${state.concelho || d.name}` : "Pesquisa atual", pipeline: "Pipeline de vendas" }[scope];
   return R.buildReport({ leads, crm: store.getCrm(), settings: state.settings, scope: label });
@@ -1012,6 +1086,7 @@ function openSettings() {
   $("#stRefresh").value = String(s.autoRefreshMin ?? 10);
   $("#stChains").checked = Boolean(s.excludeChains);
   $("#stNoSite").checked = s.onlyNoSite !== false;
+  $("#stWaDesktop").value = s.waDesktop || "web";
   fillTplSelect($("#stTplWa"), s.template || "primeiro");
   fillTplSelect($("#stTplIg"), s.templateIg || "instagram");
   fillTplSelect($("#stTplEdit"), "primeiro");
@@ -1042,6 +1117,7 @@ function bindSettings() {
       template: $("#stTplWa").value,
       templateIg: $("#stTplIg").value,
       templates: tplDraft,
+      waDesktop: $("#stWaDesktop").value,
     };
     store.saveSettings(state.settings);
     $("#settingsDialog").close();
@@ -1099,7 +1175,7 @@ function popupFor(l) {
   el.innerHTML = `<div class="pop-name">${esc(l.name)}</div>
     <div class="pop-meta">${esc(l.type)}${l.city ? ", " + esc(l.city) : ""}. ${l.score} pontos</div>
     <div class="pop-actions">
-      ${l.whatsapp ? `<a class="pop-wa" data-act="wa" href="${esc(whatsappLink(l, messageFor(enrich(l), waTemplate(l))))}" target="_blank" rel="noopener">${icon("wa")}WhatsApp</a>` : ""}
+      ${l.whatsapp ? `<a class="pop-wa" data-act="wa" ${waAttrs(l, messageFor(enrich(l), waTemplate(l)))}>${icon("wa")}WhatsApp</a>` : ""}
       ${l.instagram ? `<a data-act="ig" href="https://instagram.com/${esc(l.instagram)}" target="_blank" rel="noopener">${icon("ig")}Instagram</a>` : ""}
       ${phone ? `<a data-act="call" href="tel:${esc(phone.e164)}">${icon("phone")}Ligar</a>` : ""}
       <button type="button" data-act="open">Ficha</button>
@@ -1142,13 +1218,14 @@ function bindSearch() {
   let qTimer;
   $("#q").addEventListener("input", (e) => { clearTimeout(qTimer); qTimer = setTimeout(() => { state.filters.q = norm(e.target.value); state.page = 1; render(); }, 140); });
   $("#city").addEventListener("change", (e) => { state.filters.city = e.target.value; state.page = 1; render(); });
-  $("#sort").addEventListener("change", (e) => { state.filters.sort = e.target.value; state.page = 1; render(); });
-  $("#hideTracked").addEventListener("change", (e) => { state.filters.hideTracked = e.target.checked; state.page = 1; render(); });
+  $("#sort").addEventListener("change", (e) => { state.filters.sort = e.target.value; state.page = 1; saveFilters(); render(); });
+  $("#hideTracked").addEventListener("change", (e) => { state.filters.hideTracked = e.target.checked; state.page = 1; saveFilters(); render(); });
   $("#channel").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-v]");
     if (!b) return;
     state.filters.channel = b.dataset.v;
     syncFilterControls();
+    saveFilters();
     state.page = 1;
     render();
   });
@@ -1158,6 +1235,7 @@ function bindSearch() {
     const h = state.filters.heat;
     h.has(b.dataset.v) ? h.delete(b.dataset.v) : h.add(b.dataset.v);
     syncFilterControls();
+    saveFilters();
     state.page = 1;
     render();
   });
@@ -1182,6 +1260,12 @@ function bindSearch() {
   $("#scanAll").addEventListener("click", () => scanAll());
   $("#scanStop").addEventListener("click", () => state.scan?.abort());
   $$(".view-tab").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+  // Atalho: "/" vai para a pesquisa.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "/" || e.target.closest("input, textarea, select, [contenteditable]") || document.querySelector("dialog[open]")) return;
+    e.preventDefault();
+    (state.view === "pipeline" ? $("#pipeQ") : $("#q")).focus();
+  });
 }
 
 function readHash() {
@@ -1196,6 +1280,7 @@ async function init() {
   $(".results").dataset.mode = "list";
   buildTiles();
   bindSearch();
+  loadFilters();
   bindLeadDialog();
   bindPipeline();
   bindReport();

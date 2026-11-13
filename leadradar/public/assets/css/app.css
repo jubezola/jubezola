@@ -578,3 +578,13 @@ dialog.sheet[open] { animation: rise .2s ease-out; }
 .pipe-head .due-toggle { margin-left: auto; }
 .pcard-foot { flex-wrap: wrap; }
 .pcard-foot select { min-width: 0; max-width: 100%; }
+
+/* ── Navegação na ficha ── */
+.sheet-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+.ld-nav { display: flex; align-items: center; gap: 6px; }
+.ld-nav[hidden] { display: none; }
+.ld-pos { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ld-nav .btn .ic { width: 15px; height: 15px; margin: 0 -2px 0 2px; }
+.ic.flip { transform: scaleX(-1); }
+#ldNext:focus-visible { outline: 3px solid var(--tram); outline-offset: 2px; }
+@media (max-width: 560px) { .ld-pos { display: none; } }

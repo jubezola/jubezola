@@ -58,7 +58,7 @@ export function removeEntry(id) {
   lsSet("crm", crm);
   broadcast({ type: "crm", id, status: null });
 }
-export function reloadCrm() { crm = lsGet("crm", {}); blocked = lsGet("blocked", {}); return crm; }
+export function reloadCrm() { crm = lsGet("crm", {}); blocked = lsGet("blocked", {}); indexBlocked(); return crm; }
 
 /** "AAAA-MM-DD" na hora local. */
 export function dayKey(t = Date.now()) {
@@ -74,25 +74,31 @@ export function dueEntries() {
 // ── Lista "não contactar" (RGPD): negócios que pediram para não ser contactados ──
 // blocked[id] = { name, phones: [e164], at }
 let blocked = lsGet("blocked", {});
+let blockedPhones = new Set();
+function indexBlocked() { blockedPhones = new Set(Object.values(blocked).flatMap((b) => b.phones || [])); }
+indexBlocked();
 export function getBlocked() { return blocked; }
+/** O(1) por lead: índice de telefones bloqueados em vez de percorrer a lista. */
 export function isBlocked(lead) {
   if (blocked[lead.id]) return true;
-  const ph = new Set((lead.phones || []).map((p) => p.e164));
-  if (!ph.size) return false;
-  return Object.values(blocked).some((b) => b.phones?.some((p) => ph.has(p)));
+  if (!blockedPhones.size || !lead.phones) return false;
+  for (const p of lead.phones) if (blockedPhones.has(p.e164)) return true;
+  return false;
 }
 export function block(lead) {
   blocked[lead.id] = { name: lead.name, phones: (lead.phones || []).map((p) => p.e164), at: Date.now() };
   lsSet("blocked", blocked);
+  indexBlocked();
   if (crm[lead.id]) { delete crm[lead.id]; lsSet("crm", crm); }
   broadcast({ type: "crm", id: lead.id, status: null, name: lead.name });
 }
 export function unblock(id) {
   delete blocked[id];
   lsSet("blocked", blocked);
+  indexBlocked();
   broadcast({ type: "crm", id, status: null });
 }
-export function setBlocked(map) { blocked = { ...blocked, ...map }; lsSet("blocked", blocked); }
+export function setBlocked(map) { blocked = { ...blocked, ...map }; lsSet("blocked", blocked); indexBlocked(); }
 
 function slimLead(l) {
   const { id, osm, name, cat, type, district, street, postcode, city, lat, lon, phones, whatsapp, instagram, facebook, email, hasWebsite, site, siteUrl, hours, score, heat, reasons, concelho } = l;

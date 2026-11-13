@@ -11,6 +11,10 @@ Ferramenta para encontrar **negócios sem website** em todos os distritos de Por
 - **Sem duplicados**: o mesmo negócio registado duas vezes no OpenStreetMap (ponto + edifício) aparece uma só vez, com os contactos juntos.
 - **Pipeline de vendas** (Guardado → Contactado → Interessado → Fechado / Perdido) com notas, valor da proposta, receita e taxa de resposta.
 - **Seguimentos**: ao contactar alguém, fica marcado um seguimento para daqui a 3 dias (podes mudar: amanhã, 3 dias, 1 semana ou outra data). O separador Pipeline mostra quantos tens para hoje.
+- **Contactar em sequência**: na ficha, "Seguinte" (ou as setas ← →) passa para o próximo negócio da lista. Depois de enviar o WhatsApp, o foco fica em "Seguinte": basta carregar Enter.
+- **WhatsApp Web direto**: no computador, o WhatsApp abre no WhatsApp Web sem a página intermédia do wa.me, e sempre no mesmo separador (pode mudar-se nas Definições).
+- **Saudação automática**: a variável `{saudacao}` escreve "Bom dia", "Boa tarde" ou "Boa noite" conforme a hora.
+- **Filtros lembrados** (canal, temperatura, ordem) entre visitas; tecla `/` vai para a pesquisa.
 - **Lista "não contactar" (RGPD)**: na ficha, "Pediu para não ser contactado" esconde o negócio de todas as pesquisas e relatórios, mesmo que volte a aparecer com outro registo do mesmo telefone.
 - **Relatório geral**: PDF, Excel (5 folhas), CSV, envio por email e resumo para o teu WhatsApp.
 - Mapa com agrupamento de marcadores, modo escuro, funciona em telemóvel, sem login nem base de dados.
@@ -51,7 +55,7 @@ Edita `leadradar/public/assets/js/config.js`:
 - `brand`: nome da ferramenta (aparece no topo, nos relatórios e nos emails);
 - `supportEmail`: email de suporte no rodapé;
 - `defaults`: preço por omissão de um site, número máximo de resultados, intervalo de atualização;
-- `TEMPLATES`: as mensagens de WhatsApp e Instagram.
+- `TEMPLATES`: as mensagens de WhatsApp e Instagram (variáveis `{nome}` `{cidade}` `{categoria}` `{meu_nome}` `{preco}` `{saudacao}`).
 
 As cores estão no início de `leadradar/public/assets/css/app.css` (variáveis `--cobalt`, `--tram`, etc.).
 
@@ -82,6 +86,7 @@ Sem configuração, o botão **Enviar por email** descarrega o Excel e abre o pr
 - Se um servidor Overpass estiver ocupado, a ferramenta tenta automaticamente outro (lista em `config.js`).
 - O pipeline, as definições e os resultados ficam guardados **no browser de cada utilizador** (localStorage e IndexedDB). Em **Definições → Exportar cópia do pipeline** dá para passar tudo para outro computador.
 - Vários separadores abertos ficam sincronizados em tempo real.
+- Desempenho: os marcadores do mapa são reaproveitados entre filtros (só entram/saem os que mudam), o texto de pesquisa de cada negócio é preparado uma vez, a ordenação usa `Intl.Collator` e os módulos JS são pré-carregados em paralelo (`modulepreload`).
 
 ### Estrutura
 

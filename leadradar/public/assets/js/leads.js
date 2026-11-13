@@ -215,6 +215,12 @@ export function heatLabel(h) {
   return h === "quente" ? "Quente" : h === "morno" ? "Morno" : "Frio";
 }
 
+/** "Bom dia" / "Boa tarde" / "Boa noite" conforme a hora. */
+export function greeting(d = new Date()) {
+  const h = d.getHours();
+  return h >= 5 && h < 13 ? "Bom dia" : h >= 13 && h < 20 ? "Boa tarde" : "Boa noite";
+}
+
 /** Preenche um modelo de mensagem. */
 export function fillTemplate(text, lead, settings, catLabel) {
   const vars = {
@@ -222,14 +228,22 @@ export function fillTemplate(text, lead, settings, catLabel) {
     cidade: lead.city || lead.concelho || lead.districtName || "a sua zona",
     categoria: catLabel || "negócios locais",
     meu_nome: settings.sellerName || "um web designer da zona",
+    saudacao: greeting(),
     preco: settings.sitePrice || 450,
   };
   return text.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
 }
 
-export function whatsappLink(lead, message) {
+/**
+ * Link de WhatsApp. No computador, com mode "web", abre diretamente o WhatsApp Web
+ * (sem a página intermédia do wa.me) — e a app usa sempre o mesmo separador.
+ */
+export function whatsappLink(lead, message, mode = "app") {
   if (!lead.whatsapp) return null;
-  return `https://wa.me/${lead.whatsapp}?text=${encodeURIComponent(message)}`;
+  const text = encodeURIComponent(message);
+  return mode === "web"
+    ? `https://web.whatsapp.com/send?phone=${lead.whatsapp}&text=${text}`
+    : `https://wa.me/${lead.whatsapp}?text=${text}`;
 }
 
 export function mapsLink(lead) {
