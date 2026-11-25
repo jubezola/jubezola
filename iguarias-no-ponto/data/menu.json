@@ -1,0 +1,36 @@
+{
+  "atualizado": "2026-11-25",
+  "nota": "A ementa muda todos os dias. Confirme a disponibilidade pelo WhatsApp ou por telefone.",
+  "pratos": [
+    {
+      "prato": "Sopa de espinafres",
+      "descricao": "Sopa caseira do dia.",
+      "tipo": "sopa",
+      "preco": ""
+    },
+    {
+      "prato": "Sopa de agrião",
+      "descricao": "Sopa caseira do dia.",
+      "tipo": "sopa",
+      "preco": ""
+    },
+    {
+      "prato": "Rolinhos de frango com queijo e fiambre",
+      "descricao": "",
+      "tipo": "carne",
+      "preco": ""
+    },
+    {
+      "prato": "Cachaço de porco com cebolada de pimentos",
+      "descricao": "",
+      "tipo": "carne",
+      "preco": ""
+    },
+    {
+      "prato": "Bacalhau à Zé do Pipo",
+      "descricao": "Gratinado com puré de batata e azeitonas.",
+      "tipo": "peixe",
+      "preco": ""
+    }
+  ]
+}
