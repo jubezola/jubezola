@@ -145,11 +145,12 @@ p { margin: 0; }
 }
 .brand-name { font-weight: 800; font-size: 19px; font-variation-settings: "wdth" 118; letter-spacing: -.01em; }
 .views { display: flex; gap: 2px; padding: 3px; background: var(--page); border: 1px solid var(--line); border-radius: 10px; }
-.view-tab {
+.view-tab, .view-link {
+  text-decoration: none;
   border: 0; background: none; padding: 6px 12px; border-radius: 7px; font-weight: 600; font-size: 14.5px; color: var(--ink-2);
   display: inline-flex; align-items: center; gap: 6px;
 }
-.view-tab[aria-current="page"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(16, 27, 61, .12); }
+.view-tab[aria-current="page"], .view-link[aria-current="page"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(16, 27, 61, .12); }
 .count-pill { min-width: 20px; padding: 0 6px; height: 20px; border-radius: 10px; background: var(--cobalt-wash); color: var(--cobalt); font-size: 12px; font-weight: 700; display: inline-grid; place-items: center; font-variant-numeric: tabular-nums; }
 
 .live { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -523,7 +524,7 @@ dialog.sheet[open] { animation: rise .2s ease-out; }
   .btn-report { order: 2; }
   #openSettings { order: 3; }
   .views { order: 4; flex: 1 1 100%; }
-  .views .view-tab { flex: 1; justify-content: center; }
+  .views .view-tab, .views .view-link { flex: 1; justify-content: center; }
   .btn-report span { display: none; }
   .btn-report { width: 40px; padding: 0; min-height: 40px; }
   .hero { padding-top: 28px; padding-bottom: 28px; gap: 22px; }

@@ -1,0 +1,40 @@
+/* Conversas — reaproveita os tokens de app.css */
+.cv { max-width: 980px; margin: 0 auto; padding: clamp(20px, 4vw, 40px) var(--gutter) 64px; }
+.cv-head { display: grid; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.cv-head h1 { font-size: clamp(1.9rem, 5vw, 2.8rem); font-weight: 800; font-variation-settings: "wdth" 112; letter-spacing: -.02em; }
+.cv-lede { margin-top: 10px; color: var(--ink-2); max-width: 64ch; }
+.cv-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.cv-controls .field { display: grid; gap: 4px; }
+.cv-controls .field-label { font-size: 12.5px; font-weight: 650; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+.cv-controls select { min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--paper); }
+.cv-sources { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.cv-sources li { font-size: 13px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); }
+.cv-sources li[data-ok="false"] { border-color: var(--danger); color: var(--danger); }
+.cv-sources li[data-ok="true"] b { color: var(--wa); }
+
+.cv-feed { padding-top: 20px; }
+.cv-empty { padding: 40px 20px; text-align: center; color: var(--ink-2); border: 1px dashed var(--line); border-radius: var(--radius-l); }
+.cv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.cv-item { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-l); padding: 16px 18px; box-shadow: var(--shadow); }
+.cv-item[data-state="replied"] { opacity: .65; }
+.cv-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); }
+.cv-score { font-weight: 800; font-variant-numeric: tabular-nums; padding: 2px 8px; border-radius: 6px; background: var(--cobalt-wash); color: var(--cobalt); }
+.cv-score[data-heat="hot"] { background: var(--tram); color: var(--tram-ink); }
+.cv-src { font-weight: 700; color: var(--ink); }
+.cv-new { font-weight: 700; color: var(--wa); }
+.cv-title { margin-top: 8px; font-size: 17px; font-weight: 700; }
+.cv-title:empty { display: none; }
+.cv-text { margin-top: 6px; color: var(--ink-2); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.cv-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+.cv-save[aria-pressed="true"], .cv-replied[aria-pressed="true"] { border-color: var(--cobalt); color: var(--cobalt); }
+
+.cv-help { margin-top: 40px; padding: 20px; border-radius: var(--radius-l); background: var(--cobalt-wash); }
+.cv-help h2 { font-size: 18px; }
+.cv-help ol { margin: 10px 0 0; padding-left: 20px; color: var(--ink-2); }
+.cv-note { margin-top: 12px; font-size: 14px; color: var(--ink-2); }
+.cv-note code { font-size: 13px; }
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; }
+  .views { order: 4; flex: 1 1 100%; }
+  .cv-controls .field, .cv-controls .btn { flex: 1 1 140px; }
+}

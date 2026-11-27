@@ -19,6 +19,18 @@ Ferramenta para encontrar **negócios sem website** em todos os distritos de Por
 - **Relatório geral**: PDF, Excel (5 folhas), CSV, envio por email e resumo para o teu WhatsApp.
 - Mapa com agrupamento de marcadores, modo escuro, funciona em telemóvel, sem login nem base de dados.
 
+## Conversas: pessoas a pedir um site (`/conversas.html`)
+
+Vasculha várias plataformas à procura de quem escreve «preciso de um site», «alguém que faça sites?», «quanto custa um website», «looking for a web designer»… e mostra o **link do post** para responderes lá. Não recolhe emails nem telefones (RGPD).
+
+- **Sem configurar nada:** Reddit (incluindo r/portugal, r/empreendedorismo, r/lisboa, r/porto), Bluesky, Mastodon e Hacker News.
+- **Com `BRAVE_API_KEY`** ([api.search.brave.com](https://api.search.brave.com), tem plano gratuito): também Facebook, Instagram, LinkedIn, X, OLX, Zwame e Quora, através de pesquisas públicas indexadas.
+- Cada post recebe uma pontuação de 0 a 10: sobe com um pedido claro e com sinais de Portugal; quem *oferece* serviços (concorrência) é excluído.
+- Filtros por região (todas, em português, só Portugal), pontuação mínima e estado (por tratar, guardado, respondido, ignorado), com atualização automática de 10 ou 30 minutos.
+- A pesquisa corre no servidor (`api/social.mjs` na Vercel, `netlify/functions/social.mjs` no Netlify) e guarda o resultado em cache durante 5 minutos.
+
+Limites: WhatsApp e grupos privados de Facebook não são pesquisáveis por ninguém de fora. Algumas APIs (Reddit, Bluesky) podem bloquear ou limitar pedidos vindos de servidores na cloud; quando uma fonte falha, aparece a vermelho no topo da página e as restantes continuam a funcionar.
+
 ---
 
 ## Publicar no Netlify (5 minutos)
