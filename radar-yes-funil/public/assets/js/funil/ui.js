@@ -145,7 +145,31 @@ function schedulePoll() {
   stopPolling();
   const c = S.stats?.counts;
   const busy = S.running || (c && c.por_escrever > 0);
+  if (busy) drive();
   S.pollTimer = setTimeout(() => { if (!document.hidden || busy) refreshAll(); else schedulePoll(); }, busy ? 1200 : 10000);
+}
+
+// O servidor é serverless: a pesquisa e a escrita avançam por passos curtos que este separador vai pedindo.
+// Tudo fica guardado no servidor; fechar ou recarregar a página retoma do ponto onde estava.
+let driving = false;
+async function drive() {
+  if (driving) return;
+  driving = true;
+  let errors = 0;
+  try {
+    for (;;) {
+      const c = S.stats?.counts;
+      const tasks = [];
+      if (S.running) tasks.push(api(`/api/campaigns/${S.running.id}/step`, { method: "POST", body: {} }));
+      if (c && c.por_escrever > 0) tasks.push(api("/api/write", { method: "POST", body: {} }));
+      if (!tasks.length) break;
+      try { await Promise.all(tasks); errors = 0; }
+      catch (e) { if (e.status === 401 || ++errors >= 5) throw e; await new Promise((r) => setTimeout(r, 1000 * errors)); }
+      await refreshAll(false, { fromDriver: true });
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  } catch (e) { fail(e); }
+  finally { driving = false; }
 }
 function stopPolling() { clearTimeout(S.pollTimer); }
 

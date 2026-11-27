@@ -3,7 +3,8 @@ import { createRequire } from "node:module";
 const { chromium } = createRequire(import.meta.url)("playwright");
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
-import { mockOverpass, fixture, tmpDb } from "./helpers.mjs";
+import { createServer } from "node:http";
+import { mockOverpass, fixture, freshDbUrl } from "./helpers.mjs";
 
 const OUT = process.env.E2E_OUT || "test-results";
 mkdirSync(OUT, { recursive: true });
@@ -11,12 +12,15 @@ const ov = await mockOverpass({ elements: fixture(60, 3), delayMs: 400 });
 process.env.OVERPASS_URL = ov.url;
 const { createApp } = await import("../server/app.mjs");
 const { hashPassword } = await import("../server/auth.mjs");
-const app = createApp({ dbFile: tmpDb(), jobOptions: { batchPauseMs: 450, batchSize: 5 } });
-const add = app.db.prepare("INSERT INTO users(username, nome, role, pass_hash, created_at) VALUES (?,?,?,?,?)");
-add.run("dona", "Dona Ana", "dono", hashPassword("segredo-dona"), Date.now());
-add.run("rui", "Rui", "membro", hashPassword("segredo-rui"), Date.now());
-await new Promise((r) => app.server.listen(0, "127.0.0.1", r));
-const BASE = `http://127.0.0.1:${app.server.address().port}`;
+const { createDb } = await import("../server/db.mjs");
+const db = createDb(await freshDbUrl());
+const app = createApp({ db, jobOptions: { batchSize: 5 } });
+await db.ready();
+for (const [u, n, r, p] of [["dona", "Dona Ana", "dono", "segredo-dona"], ["rui", "Rui", "membro", "segredo-rui"]])
+  await db.q("INSERT INTO users(username, nome, role, pass_hash, created_at) VALUES ($1,$2,$3,$4,$5)", [u, n, r, hashPassword(p), Date.now()]);
+const server = createServer(app.handle);
+await new Promise((r) => server.listen(0, "127.0.0.1", r));
+const BASE = `http://127.0.0.1:${server.address().port}`;
 
 const browser = await chromium.launch();
 const errors = [];
@@ -53,7 +57,7 @@ try {
   assert.ok(seen.size >= 2, "o contador sobe por lotes: " + [...seen]);
   await page.waitForFunction(() => document.querySelector('[data-count="escritas"]').dataset.v === "45", null, { timeout: 15000 });
   await page.waitForSelector('.step[data-step="escrita"][data-state="done"]');
-  assert.equal(app.db.prepare("SELECT COUNT(*) n FROM campaigns").get().n, 1);
+  assert.equal((await db.one("SELECT COUNT(*) n FROM campaigns")).n, 1);
   assert.equal(await page.getAttribute("#funnel", "data-running"), "false");
   assert.match(await page.textContent("#startLabel"), /Nova pesquisa/);
   await page.screenshot({ path: `${OUT}/desktop-escritas.png`, fullPage: true });
@@ -69,7 +73,7 @@ try {
   await page.click('[data-filter="escrita"]');
 
   // XSS: nome externo malicioso não executa
-  app.db.prepare("UPDATE leads SET nome = ? WHERE id = (SELECT MIN(id) FROM leads)").run('<img src=x onerror="alert(1)">Café');
+  await db.q("UPDATE leads SET nome = $1 WHERE id = (SELECT MIN(id) FROM leads)", ['<img src=x onerror="alert(1)">Café']);
   await page.fill("#fNome", "Café"); await page.waitForTimeout(600);
   assert.match(await page.textContent("#list .card h3"), /<img src=x/);
   await page.fill("#fNome", ""); await page.waitForTimeout(500);
@@ -189,5 +193,5 @@ try {
   console.error("E2E FALHOU:", e.message, "\nErros de consola:", errors);
   process.exitCode = 1;
 } finally {
-  await browser.close(); app.server.close(); ov.server.close();
+  await browser.close(); server.close(); ov.server.close(); await db.end();
 }

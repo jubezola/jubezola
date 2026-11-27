@@ -1,10 +1,10 @@
-import { createServer } from "node:http";
+// Handler HTTP único: usado pelo servidor local (server/index.mjs) e pela função da Vercel (api/index.mjs).
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { openDb, getSettings, putSettings, tx } from "./db.mjs";
-import { COOKIE, verifyPassword, createSession, sessionUser, destroySession, cookieHeader, readCookie, rateLimiter } from "./auth.mjs";
-import { act, HttpError, loadLead, stats, listLeads, publicLead, publicCampaign } from "./funnel.mjs";
+import { createDb, getSettings, putSettings, allow } from "./db.mjs";
+import { verifyPassword, createSession, sessionUser, destroySession, cookieHeader, readCookie } from "./auth.mjs";
+import { act, HttpError, loadLead, stats, listLeads, publicLead, publicCampaign, userNames } from "./funnel.mjs";
 import { createJobs } from "./jobs.mjs";
 import { firstMessage } from "./messages.mjs";
 import { DISTRICTS, CATEGORIES } from "../public/assets/js/data.js";
@@ -12,17 +12,15 @@ import { DISTRICTS, CATEGORIES } from "../public/assets/js/data.js";
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
   ".png": "image/png", ".json": "application/json", ".webmanifest": "application/manifest+json", ".ico": "image/x-icon" };
-const SEC = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "X-Frame-Options": "DENY",
+export const SECURITY_HEADERS = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "X-Frame-Options": "DENY",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
   "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://overpass-api.de https://overpass.private.coffee https://overpass.kumi.systems https://maps.mail.ru; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" };
 
-export function createApp({ dbFile = process.env.DB_FILE || "data/funil.db", secure = process.env.COOKIE_SECURE === "1", jobOptions } = {}) {
-  const db = openDb(dbFile);
+export function createApp({ db = createDb(), secure = process.env.COOKIE_SECURE === "1" || !!process.env.VERCEL, jobOptions, serveStaticFiles = true } = {}) {
   const jobs = createJobs(db, jobOptions);
-  const limitLogin = rateLimiter(10, 60000), limitSearch = rateLimiter(6, 60000), limitGen = rateLimiter(30, 60000);
 
   const send = (res, status, body, headers = {}) => {
-    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...SEC, ...headers });
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...SECURITY_HEADERS, ...headers });
     res.end(JSON.stringify(body));
   };
 
@@ -36,34 +34,44 @@ export function createApp({ dbFile = process.env.DB_FILE || "data/funil.db", sec
 
   function sameOrigin(req) {
     const o = req.headers.origin;
-    if (!o) return true; // pedidos sem Origin (curl, testes) não carregam cookies de outro site
-    try { return new URL(o).host === req.headers.host; } catch { return false; }
+    if (!o) return true; // sem Origin não há cookies de outro site (SameSite=Strict)
+    const host = req.headers["x-forwarded-host"] || req.headers.host;
+    try { return new URL(o).host === host; } catch { return false; }
   }
+  const clientIp = (req) => String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").split(",")[0].trim();
+
+  async function campaignFor(user, id) {
+    const c = await db.one("SELECT * FROM campaigns WHERE id = $1", [id]);
+    if (!c) throw new HttpError(404, "Campanha não encontrada.");
+    if (user.role !== "dono" && c.criada_por !== user.id) throw new HttpError(403, "Campanha de outra pessoa.");
+    return c;
+  }
+  const leadOut = async (lead) => publicLead(lead, await getSettings(db), await userNames(db));
 
   async function api(req, res, url) {
+    await db.ready();
     const path = url.pathname, method = req.method;
     if (method !== "GET" && !sameOrigin(req)) throw new HttpError(403, "Origem não permitida.");
 
     if (path === "/api/login" && method === "POST") {
-      const ip = req.socket.remoteAddress || "";
-      if (!limitLogin(ip)) throw new HttpError(429, "Demasiadas tentativas. Espera um minuto.");
+      if (!(await allow(db, "login:" + clientIp(req), 10, 60000))) throw new HttpError(429, "Demasiadas tentativas. Espera um minuto.");
       const b = await readJson(req);
-      const u = db.prepare("SELECT * FROM users WHERE username = ?").get(String(b.username || "").trim().toLowerCase());
+      const u = await db.one("SELECT * FROM users WHERE username = $1", [String(b.username || "").trim().toLowerCase()]);
       if (!u || !verifyPassword(String(b.password || ""), u.pass_hash)) throw new HttpError(401, "Utilizador ou palavra-passe errados.");
-      const token = createSession(db, u.id);
+      const token = await createSession(db, u.id);
       return send(res, 200, { user: { id: u.id, nome: u.nome, role: u.role } }, { "Set-Cookie": cookieHeader(token, { secure }) });
     }
 
     const token = readCookie(req);
-    const user = sessionUser(db, token);
+    const user = await sessionUser(db, token);
     // Sonda de sessão para o ecrã inicial: não devolve dados, só se há sessão.
     if (path === "/api/session" && method === "GET") return send(res, 200, { autenticado: !!user });
     if (!user) throw new HttpError(401, "Sessão expirada. Entra outra vez.");
 
-    if (path === "/api/logout" && method === "POST") { destroySession(db, token); return send(res, 200, { ok: true }, { "Set-Cookie": cookieHeader("", { secure, clear: true }) }); }
+    if (path === "/api/logout" && method === "POST") { await destroySession(db, token); return send(res, 200, { ok: true }, { "Set-Cookie": cookieHeader("", { secure, clear: true }) }); }
     if (path === "/api/me" && method === "GET") {
-      const team = user.role === "dono" ? db.prepare("SELECT id, nome, role FROM users ORDER BY nome").all() : [];
-      return send(res, 200, { user, team, settings: getSettings(db),
+      const team = user.role === "dono" ? await db.all("SELECT id, nome, role FROM users ORDER BY nome") : [];
+      return send(res, 200, { user, team, settings: await getSettings(db),
         regioes: DISTRICTS.map((d) => ({ id: d.id, nome: d.name, concelhos: d.concelhos })),
         nichos: CATEGORIES.map((c) => ({ id: c.id, nome: c.short })) });
     }
@@ -73,74 +81,69 @@ export function createApp({ dbFile = process.env.DB_FILE || "data/funil.db", sec
       if (b.limite_diario != null) { const n = Number(b.limite_diario); if (!Number.isInteger(n) || n < 1 || n > 500) throw new HttpError(400, "Limite diário entre 1 e 500."); patch.limite_diario = n; }
       if (b.dias_followup != null) { const n = Number(b.dias_followup); if (!Number.isInteger(n) || n < 1 || n > 60) throw new HttpError(400, "Dias de follow-up entre 1 e 60."); patch.dias_followup = n; }
       if (b.assinatura != null) { const s = String(b.assinatura).trim(); if (s.length < 2 || s.length > 60 || /https?:|www\./i.test(s)) throw new HttpError(400, "Assinatura entre 2 e 60 caracteres, sem links."); patch.assinatura = s; }
-      return send(res, 200, { settings: putSettings(db, patch) });
+      return send(res, 200, { settings: await putSettings(db, patch) });
     }
-    if (path === "/api/stats" && method === "GET") return send(res, 200, stats(db, user, Object.fromEntries(url.searchParams)));
+    if (path === "/api/stats" && method === "GET") return send(res, 200, await stats(db, user, Object.fromEntries(url.searchParams)));
     if (path === "/api/campaigns" && method === "GET") {
-      const rows = user.role === "dono" ? db.prepare("SELECT * FROM campaigns ORDER BY id DESC LIMIT 50").all()
-        : db.prepare("SELECT * FROM campaigns WHERE criada_por = ? ORDER BY id DESC LIMIT 50").all(user.id);
-      return send(res, 200, { campanhas: rows.map((c) => publicCampaign(db, c)) });
+      const rows = user.role === "dono" ? await db.all("SELECT * FROM campaigns ORDER BY id DESC LIMIT 50")
+        : await db.all("SELECT * FROM campaigns WHERE criada_por = $1 ORDER BY id DESC LIMIT 50", [user.id]);
+      return send(res, 200, { campanhas: await Promise.all(rows.map((c) => publicCampaign(db, c))) });
     }
     if (path === "/api/campaigns" && method === "POST") {
       const b = await readJson(req);
       const key = String(b.request_key || "");
       if (!/^[A-Za-z0-9_-]{8,64}$/.test(key)) throw new HttpError(400, "request_key inválido.");
       const err = jobs.validate(b); if (err) throw new HttpError(400, err);
-      const result = tx(db, () => {
-        const same = db.prepare("SELECT * FROM campaigns WHERE request_key = ?").get(user.id + ":" + key);
-        if (same) return { c: same, existed: true };
-        const run = db.prepare("SELECT * FROM campaigns WHERE criada_por = ? AND estado = 'a_correr'").get(user.id);
-        if (run) return { c: run, existed: true };
-        return null;
-      });
-      if (result) return send(res, 200, { campanha: publicCampaign(db, result.c), existente: true });
-      if (!limitSearch(user.id)) throw new HttpError(429, "Demasiadas pesquisas seguidas. Espera um minuto.");
+      const rk = user.id + ":" + key;
+      const existing = async () => (await db.one("SELECT * FROM campaigns WHERE request_key = $1", [rk]))
+        || (await db.one("SELECT * FROM campaigns WHERE criada_por = $1 AND estado = 'a_correr'", [user.id]));
+      let c = await existing();
+      if (c) return send(res, 200, { campanha: await publicCampaign(db, c), existente: true });
+      if (!(await allow(db, "search:" + user.id, 6, 60000))) throw new HttpError(429, "Demasiadas pesquisas seguidas. Espera um minuto.");
       const now = Date.now();
-      const r = db.prepare("INSERT INTO campaigns(criada_por, nicho, regiao, concelho, pais, estado, request_key, created_at, updated_at) VALUES (?,?,?,?, 'PT', 'a_correr', ?, ?, ?)")
-        .run(user.id, String(b.nicho), String(b.regiao), String(b.concelho || ""), user.id + ":" + key, now, now);
-      const c = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(Number(r.lastInsertRowid));
-      jobs.start(c);
-      return send(res, 201, { campanha: publicCampaign(db, c), existente: false });
+      // Os índices únicos (request_key e "uma a correr por pessoa") tornam o START idempotente mesmo em pedidos simultâneos.
+      c = await db.one(`INSERT INTO campaigns(criada_por, nicho, regiao, concelho, pais, estado, request_key, created_at, updated_at)
+        VALUES ($1,$2,$3,$4,'PT','a_correr',$5,$6,$6) ON CONFLICT DO NOTHING RETURNING *`, [user.id, String(b.nicho), String(b.regiao), String(b.concelho || ""), rk, now]);
+      if (!c) { c = await existing(); return send(res, 200, { campanha: await publicCampaign(db, c), existente: true }); }
+      return send(res, 201, { campanha: await publicCampaign(db, c), existente: false });
     }
     let m;
-    if ((m = path.match(/^\/api\/campaigns\/(\d+)\/cancel$/)) && method === "POST") {
-      const c = db.prepare("SELECT * FROM campaigns WHERE id = ?").get(Number(m[1]));
-      if (!c) throw new HttpError(404, "Campanha não encontrada.");
-      if (user.role !== "dono" && c.criada_por !== user.id) throw new HttpError(403, "Campanha de outra pessoa.");
-      jobs.cancel(c.id);
-      return send(res, 200, { campanha: publicCampaign(db, db.prepare("SELECT * FROM campaigns WHERE id = ?").get(c.id)) });
+    if ((m = path.match(/^\/api\/campaigns\/(\d+)\/(cancel|step)$/)) && method === "POST") {
+      const c = await campaignFor(user, Number(m[1]));
+      if (m[2] === "cancel") await jobs.cancel(c.id);
+      else await jobs.searchStep(c.id);
+      return send(res, 200, { campanha: await publicCampaign(db, await db.one("SELECT * FROM campaigns WHERE id = $1", [c.id])) });
     }
-    if (path === "/api/leads" && method === "GET") return send(res, 200, listLeads(db, user, Object.fromEntries(url.searchParams)));
-    if ((m = path.match(/^\/api\/leads\/(\d+)$/)) && method === "GET") return send(res, 200, { lead: publicLead(db, loadLead(db, user, Number(m[1]))) });
+    if (path === "/api/write" && method === "POST") return send(res, 200, { escritas: await jobs.writeStep(user) });
+    if (path === "/api/leads" && method === "GET") return send(res, 200, await listLeads(db, user, Object.fromEntries(url.searchParams)));
+    if ((m = path.match(/^\/api\/leads\/(\d+)$/)) && method === "GET") return send(res, 200, { lead: await leadOut(await loadLead(db, user, Number(m[1]))) });
     if ((m = path.match(/^\/api\/leads\/(\d+)\/(regenerate|retry)$/)) && method === "POST") {
-      if (!limitGen(user.id)) throw new HttpError(429, "Demasiadas gerações seguidas. Espera um minuto.");
       const id = Number(m[1]);
-      const lead = loadLead(db, user, id);
+      const lead = await loadLead(db, user, id);
+      if (!(await allow(db, "gen:" + user.id, 30, 60000))) throw new HttpError(429, "Demasiadas gerações seguidas. Espera um minuto.");
       if (!["encontrada", "escrita"].includes(lead.etapa)) throw new HttpError(409, "A mensagem já foi enviada.");
       if (lead.excluida || lead.invalido) throw new HttpError(409, "Lead excluído ou com número inválido.");
       if (m[2] === "retry") {
-        db.prepare("UPDATE leads SET falha_escrita = NULL, updated_at = ? WHERE id = ?").run(Date.now(), id);
-        jobs.enqueue(id);
+        await db.q("UPDATE leads SET falha_escrita = NULL, escrita_lock = NULL, updated_at = $2 WHERE id = $1", [id, Date.now()]);
       } else {
-        const author = db.prepare("SELECT nome FROM users WHERE id = ?").get(lead.atribuida_a);
+        const names = await userNames(db);
         const variante = lead.variante + 1;
-        const msg = firstMessage(lead, { remetente: author?.nome || "", assinatura: getSettings(db).assinatura }, variante);
-        db.prepare("UPDATE leads SET mensagem = ?, mensagem_origem = 'template', variante = ?, etapa = 'escrita', falha_escrita = NULL, updated_at = ? WHERE id = ?")
-          .run(msg, variante, Date.now(), id);
+        const msg = firstMessage(lead, { remetente: names[lead.atribuida_a] || "", assinatura: (await getSettings(db)).assinatura }, variante);
+        await db.q("UPDATE leads SET mensagem = $1, mensagem_origem = 'template', variante = $2, etapa = 'escrita', falha_escrita = NULL, updated_at = $3 WHERE id = $4 AND etapa IN ('encontrada','escrita')",
+          [msg, variante, Date.now(), id]);
       }
-      return send(res, 200, { lead: publicLead(db, db.prepare("SELECT * FROM leads WHERE id = ?").get(id)) });
+      return send(res, 200, { lead: await leadOut(await db.one("SELECT * FROM leads WHERE id = $1", [id])) });
     }
     if ((m = path.match(/^\/api\/leads\/(\d+)\/(edit|send|respond|followup|exclude|invalid|undo|assign)$/)) && method === "POST") {
       const b = await readJson(req);
-      const lead = act(db, user, Number(m[1]), m[2], b);
-      if (lead.etapa === "encontrada" && !lead.falha_escrita && !lead.excluida && !lead.invalido) jobs.enqueue(lead.id);
-      return send(res, 200, { lead: publicLead(db, lead) });
+      return send(res, 200, { lead: await leadOut(await act(db, user, Number(m[1]), m[2], b)) });
     }
     throw new HttpError(404, "Rota inexistente.");
   }
 
   async function serveStatic(req, res, url) {
-    let p = decodeURIComponent(url.pathname);
+    let p;
+    try { p = decodeURIComponent(url.pathname); } catch { res.writeHead(400); return res.end(); }
     if (p === "/") p = "/index.html";
     const file = normalize(join(PUBLIC, p));
     if (!file.startsWith(PUBLIC.endsWith(sep) ? PUBLIC : PUBLIC + sep)) { res.writeHead(403); return res.end(); }
@@ -149,23 +152,22 @@ export function createApp({ dbFile = process.env.DB_FILE || "data/funil.db", sec
       if (!st.isFile()) throw 0;
       const body = await readFile(file);
       const cache = p.includes("/vendor/") ? "public, max-age=31536000, immutable" : "no-cache";
-      res.writeHead(200, { "Content-Type": TYPES[extname(file)] || "application/octet-stream", "Cache-Control": cache, ...SEC });
+      res.writeHead(200, { "Content-Type": TYPES[extname(file)] || "application/octet-stream", "Cache-Control": cache, ...SECURITY_HEADERS });
       res.end(req.method === "HEAD" ? undefined : body);
-    } catch { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...SEC }); res.end("Não encontrado"); }
+    } catch { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...SECURITY_HEADERS }); res.end("Não encontrado"); }
   }
 
-  const server = createServer(async (req, res) => {
+  async function handle(req, res) {
     const url = new URL(req.url, "http://x");
     try {
       if (url.pathname.startsWith("/api/")) await api(req, res, url);
-      else if (req.method === "GET" || req.method === "HEAD") await serveStatic(req, res, url);
-      else { res.writeHead(405); res.end(); }
+      else if (serveStaticFiles && (req.method === "GET" || req.method === "HEAD")) await serveStatic(req, res, url);
+      else { res.writeHead(404); res.end(); }
     } catch (err) {
       const status = err instanceof HttpError ? err.status : 500;
       if (status === 500) console.error(err);
       if (!res.headersSent) send(res, status, { error: status === 500 ? "Erro interno." : err.message });
     }
-  });
-  return { server, db, jobs };
+  }
+  return { handle, db, jobs };
 }
-export { COOKIE };

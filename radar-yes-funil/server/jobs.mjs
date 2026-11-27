@@ -1,4 +1,5 @@
-// Pesquisa (Encontradas) e escrita em pipeline (Escritas), no servidor.
+// Pesquisa (Encontradas) e escrita (Escritas) por passos curtos, compatíveis com funções serverless:
+// o browser chama /step e /write em ciclo; o estado fica todo no Postgres (recarregar não perde nada).
 // Reutiliza os módulos do LeadRadar: consulta Overpass, conversão em lead, deteção de "só redes" e franquias.
 import { CONFIG } from "../public/assets/js/config.js";
 import { fetchLeads } from "../public/assets/js/overpass.js";
@@ -11,10 +12,7 @@ import { getSettings } from "./db.mjs";
 
 if (process.env.OVERPASS_URL) CONFIG.overpassEndpoints = [process.env.OVERPASS_URL];
 
-const sleep = (ms, signal) => new Promise((res, rej) => {
-  const t = setTimeout(res, ms);
-  signal?.addEventListener("abort", () => { clearTimeout(t); rej(signal.reason); }, { once: true });
-});
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Negócios fechados (temporária ou permanentemente), quando o OSM o indica. */
 export function isClosed(tags = {}) {
@@ -22,7 +20,7 @@ export function isClosed(tags = {}) {
   if (/^(yes|closed)$/i.test(tags.disused || "") || /^(yes|closed)$/i.test(tags.closed || "")) return true;
   if (Object.keys(tags).some((k) => /^(disused|abandoned|was|demolished|removed|razed):/.test(k))) return true;
   if (tags.end_date && Date.parse(tags.end_date) < Date.now()) return true;
-  if (/^(temporarily|permanently)?_?closed$/i.test(tags["operational_status"] || tags.status || "")) return true;
+  if (/^(temporarily|permanently)?_?closed$/i.test(tags.operational_status || tags.status || "")) return true;
   return false;
 }
 
@@ -54,113 +52,115 @@ export function toFunnelLead(l, pais = "PT") {
   };
 }
 
-export function createJobs(db, { generate = firstMessage, concurrency = 4, batchSize = 20, batchPauseMs = 250 } = {}) {
-  const running = new Map(); // campaignId -> AbortController
-  const queue = [];
-  const queued = new Set();
-  let active = 0;
+export function createJobs(db, { generate = firstMessage, batchSize = 20, writeBatch = 12, concurrency = 4, fetchTimeoutMs = 45000, lockMs = 55000, maxFetchTries = 3 } = {}) {
 
-  const insert = db.prepare(`INSERT OR IGNORE INTO leads(campanha_id, place_id, nome, categoria, nicho, cidade, url_maps, avaliacao, n_avaliacoes,
-    site_tipo, rede_social, telefone_e164, tipo_tel, atribuida_a, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+  async function fetchCandidates(c) {
+    const district = DISTRICT_BY_ID[c.regiao];
+    const res = await fetchLeads({ district, concelho: c.concelho || "", onlyNoSite: true, excludeChains: true, limit: 2500 }, { signal: AbortSignal.timeout(fetchTimeoutMs) });
+    const open = res.elements.filter((e) => !isClosed(e.tags));
+    let leads = dedupeLeads(open.map((e) => toLead(e, district.id)).filter(Boolean));
+    if (c.nicho !== "todos") leads = leads.filter((l) => l.cat === c.nicho);
+    const out = [];
+    let invalidas = 0;
+    for (const l of leads) { const f = toFunnelLead(l, c.pais); if (f) out.push(f); else invalidas++; }
+    return { out, invalidas };
+  }
 
-  function enqueue(id) { if (!queued.has(id)) { queued.add(id); queue.push(id); pump(); } }
-
-  function pump() {
-    while (active < concurrency && queue.length) {
-      const id = queue.shift();
-      active++;
-      writeOne(id).finally(() => { active--; queued.delete(id); pump(); });
+  /** Um passo da pesquisa: obter resultados (1.º passo) ou gravar o próximo lote. */
+  async function searchStep(campaignId) {
+    const now = Date.now();
+    const c = await db.one(`UPDATE campaigns SET lock_until = $2 WHERE id = $1 AND estado = 'a_correr' AND (lock_until IS NULL OR lock_until < $3) RETURNING *`,
+      [campaignId, now + lockMs, now]);
+    if (!c) return;
+    try {
+      if (!c.obtida) {
+        try {
+          const { out, invalidas } = await fetchCandidates(c);
+          await db.q(`UPDATE campaigns SET pendentes = $2, obtida = TRUE, invalidas = $3, updated_at = $4 WHERE id = $1 AND estado = 'a_correr'`,
+            [c.id, JSON.stringify(out), invalidas, Date.now()]);
+        } catch (err) {
+          const tries = c.tentativas_pesquisa + 1;
+          const msg = String(err?.name === "TimeoutError" ? "O OpenStreetMap demorou demasiado a responder." : err?.message || err).slice(0, 300);
+          await db.q(`UPDATE campaigns SET tentativas_pesquisa = $2::int, estado = CASE WHEN $2::int >= $3::int THEN 'erro' ELSE estado END, erro = $4, updated_at = $5 WHERE id = $1 AND estado = 'a_correr'`,
+            [c.id, tries, maxFetchTries, msg, Date.now()]);
+        }
+        return;
+      }
+      await db.tx(async (t) => {
+        const cur = await t.one("SELECT * FROM campaigns WHERE id = $1 FOR UPDATE", [c.id]);
+        if (cur.estado !== "a_correr") return;
+        const all = Array.isArray(cur.pendentes) ? cur.pendentes : [];
+        const batch = all.slice(0, batchSize), rest = all.slice(batchSize);
+        let ignoradas = 0;
+        const ts = Date.now();
+        for (const f of batch) {
+          if (await isExcluded(t, f.place_id, f.telefone_e164)) { ignoradas++; continue; }
+          const r = await t.q(`INSERT INTO leads(campanha_id, place_id, nome, categoria, nicho, cidade, url_maps, avaliacao, n_avaliacoes,
+              site_tipo, rede_social, telefone_e164, tipo_tel, atribuida_a, created_at, updated_at)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15) ON CONFLICT DO NOTHING`,
+            [cur.id, f.place_id, f.nome, f.categoria, f.nicho, f.cidade, f.url_maps, f.avaliacao, f.n_avaliacoes, f.site_tipo, f.rede_social, f.telefone_e164, f.tipo_tel, cur.criada_por, ts]);
+          if (!r.rowCount) ignoradas++;
+        }
+        await t.q(`UPDATE campaigns SET pendentes = $2, ignoradas = ignoradas + $3, estado = CASE WHEN $4::boolean THEN 'concluida' ELSE estado END, updated_at = $5 WHERE id = $1`,
+          [cur.id, rest.length ? JSON.stringify(rest) : null, ignoradas, rest.length === 0, ts]);
+      });
+    } finally {
+      await db.q("UPDATE campaigns SET lock_until = NULL WHERE id = $1", [c.id]);
     }
   }
 
-  async function writeOne(id) {
+  async function writeOne(lead, ctx) {
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const lead = db.prepare("SELECT * FROM leads WHERE id = ?").get(id);
-      if (!lead || lead.etapa !== "encontrada" || lead.excluida || lead.invalido) return;
       try {
-        const author = db.prepare("SELECT nome FROM users WHERE id = ?").get(lead.atribuida_a);
-        const s = getSettings(db);
         const msg = await Promise.race([
-          Promise.resolve().then(() => generate(lead, { remetente: author?.nome || "", assinatura: s.assinatura }, lead.variante)),
-          sleep(15000).then(() => { throw new Error("tempo esgotado"); }),
+          Promise.resolve().then(() => generate(lead, ctx, lead.variante)),
+          sleep(10000).then(() => { throw new Error("tempo esgotado"); }),
         ]);
         if (!msg || typeof msg !== "string") throw new Error("mensagem vazia");
-        db.prepare("UPDATE leads SET mensagem = ?, mensagem_origem = 'template', etapa = 'escrita', falha_escrita = NULL, tentativas = ?, updated_at = ? WHERE id = ? AND etapa = 'encontrada'")
-          .run(msg, attempt, Date.now(), id);
-        return;
+        await db.q(`UPDATE leads SET mensagem = $1, mensagem_origem = 'template', etapa = 'escrita', falha_escrita = NULL, tentativas = $2, escrita_lock = NULL, updated_at = $3
+          WHERE id = $4 AND etapa = 'encontrada'`, [msg, attempt, Date.now(), lead.id]);
+        return true;
       } catch (err) {
         if (attempt === 3) {
-          db.prepare("UPDATE leads SET falha_escrita = ?, tentativas = ?, updated_at = ? WHERE id = ?").run(String(err.message || err).slice(0, 200), attempt, Date.now(), id);
-          return;
+          await db.q("UPDATE leads SET falha_escrita = $1, tentativas = $2, escrita_lock = NULL, updated_at = $3 WHERE id = $4",
+            [String(err.message || err).slice(0, 200), attempt, Date.now(), lead.id]);
+          return false;
         }
-        await sleep(200 * 2 ** (attempt - 1) + Math.random() * 100);
+        await sleep(150 * 2 ** (attempt - 1) + Math.random() * 100);
       }
     }
   }
 
-  async function search(campaign, signal) {
-    const district = DISTRICT_BY_ID[campaign.regiao];
-    const res = await fetchLeads({ district, concelho: campaign.concelho || "", onlyNoSite: true, excludeChains: true, limit: 2500 }, { signal });
-    signal.throwIfAborted();
-    const open = res.elements.filter((e) => !isClosed(e.tags));
-    let leads = dedupeLeads(open.map((e) => toLead(e, district.id)).filter(Boolean));
-    if (campaign.nicho !== "todos") leads = leads.filter((l) => l.cat === campaign.nicho);
-    let ignoradas = 0, invalidas = 0;
-    for (let i = 0; i < leads.length; i += batchSize) {
-      signal.throwIfAborted();
-      const now = Date.now();
-      const ids = [];
-      db.exec("BEGIN IMMEDIATE");
-      try {
-        for (const raw of leads.slice(i, i + batchSize)) {
-          const f = toFunnelLead(raw, campaign.pais);
-          if (!f) { invalidas++; continue; }
-          if (isExcluded(db, f.place_id, f.telefone_e164)) { ignoradas++; continue; }
-          const r = insert.run(campaign.id, f.place_id, f.nome, f.categoria, f.nicho, f.cidade, f.url_maps, f.avaliacao, f.n_avaliacoes,
-            f.site_tipo, f.rede_social, f.telefone_e164, f.tipo_tel, campaign.criada_por, now, now);
-          if (r.changes) ids.push(Number(r.lastInsertRowid)); else ignoradas++;
-        }
-        db.prepare("UPDATE campaigns SET ignoradas = ?, invalidas = ?, updated_at = ? WHERE id = ?").run(ignoradas, invalidas, now, campaign.id);
-        db.exec("COMMIT");
-      } catch (e) { db.exec("ROLLBACK"); throw e; }
-      ids.forEach(enqueue); // a escrita começa logo, lote a lote
-      if (i + batchSize < leads.length) await sleep(batchPauseMs, signal);
-    }
+  /** Um passo de escrita: reclama até `writeBatch` leads por escrever e escreve-os com concorrência limitada. */
+  async function writeStep(user) {
+    const now = Date.now();
+    const leads = await db.all(`UPDATE leads SET escrita_lock = $1 WHERE id IN (
+        SELECT id FROM leads WHERE etapa = 'encontrada' AND falha_escrita IS NULL AND NOT excluida AND NOT invalido
+          AND (escrita_lock IS NULL OR escrita_lock < $2) AND ($3 OR atribuida_a = $4)
+        ORDER BY id LIMIT ${writeBatch} FOR UPDATE SKIP LOCKED) RETURNING *`, [now + 30000, now, user.role === "dono", user.id]);
+    if (!leads.length) return 0;
+    const s = await getSettings(db);
+    const names = Object.fromEntries((await db.all("SELECT id, nome FROM users")).map((u) => [u.id, u.nome]));
+    let ok = 0, i = 0;
+    await Promise.all(Array.from({ length: Math.min(concurrency, leads.length) }, async () => {
+      while (i < leads.length) { const l = leads[i++]; if (await writeOne(l, { remetente: names[l.atribuida_a] || "", assinatura: s.assinatura })) ok++; }
+    }));
+    return ok;
   }
 
-  function start(campaign) {
-    const ctrl = new AbortController();
-    running.set(campaign.id, ctrl);
-    const done = (estado, erro = null) => {
-      running.delete(campaign.id);
-      db.prepare("UPDATE campaigns SET estado = ?, erro = ?, updated_at = ? WHERE id = ? AND estado = 'a_correr'").run(estado, erro, Date.now(), campaign.id);
-    };
-    search(campaign, ctrl.signal).then(() => done("concluida"), (err) => {
-      if (ctrl.signal.aborted) done("cancelada");
-      else done("erro", String(err.message || err).slice(0, 300));
-    });
+  async function cancel(id) {
+    await db.q("UPDATE campaigns SET estado = 'cancelada', pendentes = NULL, updated_at = $2 WHERE id = $1 AND estado = 'a_correr'", [id, Date.now()]);
   }
 
-  function cancel(id) {
-    const c = running.get(id);
-    if (c) c.abort(new Error("cancelada"));
-    db.prepare("UPDATE campaigns SET estado = 'cancelada', updated_at = ? WHERE id = ? AND estado = 'a_correr'").run(Date.now(), id);
+  function validate(body) {
+    const regiao = String(body.regiao || "");
+    if (!DISTRICT_BY_ID[regiao]) return "Região inválida.";
+    const nicho = String(body.nicho || "");
+    if (nicho !== "todos" && !CATEGORY_BY_ID[nicho]) return "Nicho inválido.";
+    const concelho = String(body.concelho || "");
+    if (concelho && !DISTRICT_BY_ID[regiao].concelhos.includes(concelho)) return "Concelho inválido.";
+    return null;
   }
 
-  // Ao arrancar, retoma escritas pendentes de pesquisas anteriores.
-  for (const r of db.prepare("SELECT id FROM leads WHERE etapa = 'encontrada' AND falha_escrita IS NULL AND excluida = 0 AND invalido = 0").all()) enqueue(r.id);
-
-  return {
-    start, cancel, enqueue, isRunning: (id) => running.has(id),
-    idle: () => active === 0 && queue.length === 0 && running.size === 0,
-    validate(body) {
-      const regiao = String(body.regiao || "");
-      if (!DISTRICT_BY_ID[regiao]) return "Região inválida.";
-      const nicho = String(body.nicho || "");
-      if (nicho !== "todos" && !CATEGORY_BY_ID[nicho]) return "Nicho inválido.";
-      const concelho = String(body.concelho || "");
-      if (concelho && !DISTRICT_BY_ID[regiao].concelhos.includes(concelho)) return "Concelho inválido.";
-      return null;
-    },
-  };
+  return { searchStep, writeStep, cancel, validate };
 }
