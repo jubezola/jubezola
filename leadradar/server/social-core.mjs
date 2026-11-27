@@ -1,8 +1,7 @@
 // Conversas: procura em várias plataformas pessoas que PRECISAM de um website
 // (sobretudo em Portugal) e devolve o link do post para o utilizador responder lá.
-// Sem chaves: Reddit, Bluesky, Hacker News, Mastodon. Com chave opcional:
-// BRAVE_API_KEY (Brave Search) cobre Facebook, Instagram, LinkedIn, X, OLX,
-// Zwame e fóruns PT através de pesquisas site:.
+// Só fontes públicas, sem login nem chave de API: Reddit, Bluesky, Lemmy,
+// Mastodon e Hacker News.
 // Não recolhe emails nem telefones: só o link público e o autor (RGPD).
 
 const UA = "LeadRadar/1.0 (+conversas)";
@@ -107,26 +106,16 @@ export const parsers = {
       url: safeUrl(s.url), author: s.account?.acct, date: s.created_at,
     }));
   },
-  brave(json) {
-    return (json?.web?.results || []).map((r) => {
-      let host = ""; try { host = new URL(r.url).hostname.replace(/^www\./, ""); } catch {}
-      return {
-        source: braveLabel(host), where: host, title: clean(r.title, 200),
-        text: clean([r.description, ...(r.extra_snippets || [])].join(" ")),
-        url: safeUrl(r.url), author: "", date: r.page_age || null,
-      };
-    });
+  lemmy(json, host) {
+    return (json?.posts || []).map(({ post: p, creator: c, community: m }) => ({
+      source: "Lemmy", where: m?.name ? `${m.name}@${host}` : host, title: clean(p?.name, 200), text: clean(p?.body),
+      url: safeUrl(p?.ap_id), author: c?.name, date: p?.published,
+    }));
   },
 };
 
-function braveLabel(host) {
-  const map = { "facebook.com": "Facebook", "instagram.com": "Instagram", "linkedin.com": "LinkedIn", "x.com": "X", "twitter.com": "X", "olx.pt": "OLX", "forum.zwame.pt": "Zwame", "zwame.pt": "Zwame", "quora.com": "Quora", "tiktok.com": "TikTok" };
-  return map[host] || Object.entries(map).find(([k]) => host.endsWith("." + k))?.[1] || "Web";
-}
 
-const BRAVE_SITES = ["facebook.com", "instagram.com", "linkedin.com", "x.com", "olx.pt", "forum.zwame.pt", "quora.com"];
-
-function sources(env) {
+function sources() {
   const list = [];
   const pt = QUERIES_PT.slice(0, 6);
   for (const q of pt) list.push({ name: "Reddit", run: async () => parsers.reddit(await getJSON(`https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&t=month&limit=25&raw_json=1`)) });
@@ -134,14 +123,7 @@ function sources(env) {
   for (const q of pt.slice(0, 4)) list.push({ name: "Bluesky", run: async () => parsers.bluesky(await getJSON(`https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(q.replace(/"/g, ""))}&lang=pt&sort=latest&limit=25`)) });
   for (const q of QUERIES_EN) list.push({ name: "Hacker News", run: async () => parsers.hn(await getJSON(`https://hn.algolia.com/api/v1/search_by_date?query=${encodeURIComponent(q.replace(/"/g, ""))}&tags=(story,comment)&hitsPerPage=20`)) });
   for (const host of ["masto.pt", "mastodon.social"]) for (const tag of ["website", "webdesign", "portugal"]) list.push({ name: "Mastodon", run: async () => parsers.mastodon(await getJSON(`https://${host}/api/v1/timelines/tag/${tag}?limit=40`), host) });
-  const key = env("BRAVE_API_KEY");
-  if (key) {
-    const phrases = ["\"preciso de um site\"", "\"alguém que faça sites\"", "\"recomendam\" \"site\" \"empresa\"", "\"procuro web designer\""];
-    for (const site of BRAVE_SITES) {
-      const q = `site:${site} (${phrases.join(" OR ")})`;
-      list.push({ name: braveLabel(site), run: async () => parsers.brave(await getJSON(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&country=pt&search_lang=pt-pt&freshness=pm&count=20&extra_snippets=1`, { headers: { "X-Subscription-Token": key } })) });
-    }
-  }
+  for (const host of ["lemmy.pt", "lemmy.world"]) for (const q of ["preciso de um site", "web designer", "website"]) list.push({ name: "Lemmy", run: async () => parsers.lemmy(await getJSON(`https://${host}/api/v3/search?q=${encodeURIComponent(q)}&type_=Posts&sort=New&limit=30`), host) });
   return list;
 }
 
@@ -167,7 +149,7 @@ export function finalize(items, { minScore = 3, region = "all" } = {}) {
 let cache = { at: 0, raw: null, status: null };
 const CACHE_MS = 5 * 60 * 1000;
 
-export async function handleSocial(request, env) {
+export async function handleSocial(request) {
   if (request.method !== "GET") return json({ error: "Método não permitido" }, 405);
   const u = new URL(request.url);
   const minScore = Math.max(0, Math.min(10, Number(u.searchParams.get("min") ?? 3) || 0));
@@ -175,7 +157,7 @@ export async function handleSocial(request, env) {
   const fresh = u.searchParams.get("fresh") === "1";
 
   if (fresh || !cache.raw || Date.now() - cache.at > CACHE_MS) {
-    const list = sources(env);
+    const list = sources();
     const results = await Promise.allSettled(list.map((s) => s.run()));
     const status = {};
     const raw = [];
@@ -188,7 +170,7 @@ export async function handleSocial(request, env) {
     cache = { at: Date.now(), raw, status };
   }
   const items = finalize(cache.raw, { minScore, region });
-  return json({ updatedAt: new Date(cache.at).toISOString(), braveEnabled: Boolean(env("BRAVE_API_KEY")), sources: cache.status, count: items.length, items }, 200);
+  return json({ updatedAt: new Date(cache.at).toISOString(), sources: cache.status, count: items.length, items }, 200);
 }
 
 function json(body, status) {
