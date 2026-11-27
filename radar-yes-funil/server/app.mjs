@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDb, getSettings, putSettings, allow } from "./db.mjs";
-import { verifyPassword, createSession, sessionUser, destroySession, cookieHeader, readCookie } from "./auth.mjs";
+import { hashPassword, verifyPassword, createSession, sessionUser, destroySession, cookieHeader, readCookie } from "./auth.mjs";
 import { act, HttpError, loadLead, stats, listLeads, publicLead, publicCampaign, userNames } from "./funnel.mjs";
 import { createJobs } from "./jobs.mjs";
 import { firstMessage } from "./messages.mjs";
@@ -18,6 +18,19 @@ export const SECURITY_HEADERS = { "X-Content-Type-Options": "nosniff", "Referrer
 
 export function createApp({ db = createDb(), secure = process.env.COOKIE_SECURE === "1" || !!process.env.VERCEL, jobOptions, serveStaticFiles = true } = {}) {
   const jobs = createJobs(db, jobOptions);
+
+  // Contas iniciais vindas de variáveis de ambiente (segredos só no servidor):
+  //   FUNIL_USERS = "utilizador:dono:palavra-passe:Nome,outro:membro:senha:Nome"
+  // Úteis com a BD temporária, que começa vazia sempre que a instância recicla.
+  let seeded;
+  const seed = () => (seeded ||= (async () => {
+    for (const entry of String(process.env.FUNIL_USERS || "").split(",").map((s) => s.trim()).filter(Boolean)) {
+      const [username, role, password, ...nome] = entry.split(":");
+      if (!username || !["dono", "membro"].includes(role) || !password || password.length < 8) continue;
+      await db.q(`INSERT INTO users(username, nome, role, pass_hash, created_at) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (username) DO NOTHING`,
+        [username.toLowerCase(), nome.join(":") || username, role, hashPassword(password), Date.now()]);
+    }
+  })().catch((e) => { seeded = null; throw e; }));
 
   const send = (res, status, body, headers = {}) => {
     res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...SECURITY_HEADERS, ...headers });
@@ -50,6 +63,7 @@ export function createApp({ db = createDb(), secure = process.env.COOKIE_SECURE 
 
   async function api(req, res, url) {
     await db.ready();
+    await seed();
     const path = url.pathname, method = req.method;
     if (method !== "GET" && !sameOrigin(req)) throw new HttpError(403, "Origem não permitida.");
 
@@ -71,7 +85,7 @@ export function createApp({ db = createDb(), secure = process.env.COOKIE_SECURE 
     if (path === "/api/logout" && method === "POST") { await destroySession(db, token); return send(res, 200, { ok: true }, { "Set-Cookie": cookieHeader("", { secure, clear: true }) }); }
     if (path === "/api/me" && method === "GET") {
       const team = user.role === "dono" ? await db.all("SELECT id, nome, role FROM users ORDER BY nome") : [];
-      return send(res, 200, { user, team, settings: await getSettings(db),
+      return send(res, 200, { user, team, settings: await getSettings(db), temporario: !!db.temporario,
         regioes: DISTRICTS.map((d) => ({ id: d.id, nome: d.name, concelhos: d.concelhos })),
         nichos: CATEGORIES.map((c) => ({ id: c.id, nome: c.short })) });
     }

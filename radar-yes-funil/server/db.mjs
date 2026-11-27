@@ -55,8 +55,28 @@ function wrap(runner) {
   };
 }
 
+/**
+ * Sem DATABASE_URL: Postgres embutido (PGlite) em /tmp. Serve para pôr o site no ar já,
+ * mas os dados são TEMPORÁRIOS (perdem-se quando a instância serverless recicla). A UI avisa.
+ */
+function createEmbeddedDb(dir = process.env.PGLITE_DIR || "/tmp/funil-pglite") {
+  let pgPromise;
+  const get = () => (pgPromise ||= import("@electric-sql/pglite").then(({ PGlite }) => PGlite.create(dir)));
+  const norm = (r) => ({ rows: r.rows, rowCount: r.affectedRows ?? r.rows.length });
+  const db = wrap(async (sql, p) => norm(await (await get()).query(sql, p)));
+  let ready;
+  db.temporario = true;
+  db.ready = () => (ready ||= get().then((pg) => pg.exec(SCHEMA)).catch((e) => { ready = null; throw e; }));
+  db.tx = async (fn) => (await get()).transaction((t) => fn(wrap(async (sql, p) => norm(await t.query(sql, p)))));
+  db.end = async () => { if (pgPromise) await (await pgPromise).close(); };
+  return db;
+}
+
 export function createDb(url = process.env.DATABASE_URL) {
-  if (!url) throw new Error("DATABASE_URL em falta. Define a ligação ao Postgres (ver .env.example).");
+  if (!url) {
+    if (process.env.VERCEL || process.env.FUNIL_EMBEDDED === "1") return createEmbeddedDb();
+    throw new Error("DATABASE_URL em falta. Define a ligação ao Postgres (ver .env.example).");
+  }
   const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
   const pool = new pg.Pool({
     connectionString: url, max: process.env.VERCEL ? 3 : 10, idleTimeoutMillis: 10000, connectionTimeoutMillis: 10000,

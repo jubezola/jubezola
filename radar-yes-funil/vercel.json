@@ -5,7 +5,7 @@
   "installCommand": "npm ci --omit=dev",
   "outputDirectory": "public",
   "functions": {
-    "api/index.mjs": { "maxDuration": 60, "includeFiles": "{server,public/assets/js}/**" }
+    "api/index.mjs": { "maxDuration": 60, "includeFiles": "{server/**,public/assets/js/**,node_modules/@electric-sql/pglite/dist/**}" }
   },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/index?__p=:path*" }

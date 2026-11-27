@@ -252,3 +252,5 @@ dialog .toasts { position: fixed; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.temp-banner { margin: 0; padding: 10px var(--gutter); background: rgba(255, 200, 87, .12); border-bottom: 1px solid rgba(255, 200, 87, .35); color: var(--warn); font-size: 14px; text-align: center; }

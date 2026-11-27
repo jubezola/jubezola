@@ -66,6 +66,7 @@ async function boot() {
     if (!(await api("/api/session")).autenticado) return showLogin();
     const me = await api("/api/me");
     Object.assign(S, { me: me.user, team: me.team, settings: me.settings, regioes: me.regioes, nichos: me.nichos });
+    $("#tempBanner").hidden = !me.temporario;
     showApp();
   } catch (e) {
     if (e.status === 401) showLogin(); else { showLogin(); $("#loginError").textContent = e.message; }
