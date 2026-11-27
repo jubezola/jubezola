@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Conversas — LeadRadar</title>
+  <meta name="description" content="Pessoas a pedir um website agora mesmo no Reddit, Bluesky, Lemmy, Mastodon e Hacker News. Abre o post e responde.">
+  <meta name="theme-color" content="#1D3FA0">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/conversas.css">
+</head>
+<body>
+  <a class="skip" href="#feed">Saltar para as conversas</a>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="LeadRadar, início">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">LeadRadar</span>
+    </a>
+    <nav class="views" aria-label="Secções">
+      <a class="view-link" href="./">Procurar</a>
+      <a class="view-link" href="conversas.html" aria-current="page">Conversas</a>
+    </nav>
+    <div class="live" id="live" data-state="idle" role="status" aria-live="polite">
+      <span class="live-dot" aria-hidden="true"></span>
+      <span class="live-text" id="liveText">Pronto</span>
+    </div>
+  </header>
+
+  <main class="cv">
+    <section class="cv-head" aria-labelledby="cvTitle">
+      <div>
+        <h1 id="cvTitle">Gente a pedir um site, agora.</h1>
+        <p class="cv-lede">Vasculhamos várias plataformas à procura de quem escreve «preciso de um site», «alguém que faça sites?» ou «quanto custa um website». Cada resultado leva-te ao post original para responderes lá, sem recolher contactos de ninguém.</p>
+      </div>
+      <div class="cv-controls">
+        <label class="field field-inline"><span class="field-label">Região</span>
+          <select id="region">
+            <option value="all">Todas</option>
+            <option value="lusofono">Em português</option>
+            <option value="pt">Só Portugal</option>
+          </select>
+        </label>
+        <label class="field field-inline"><span class="field-label">Mínimo</span>
+          <select id="min">
+            <option value="3">Morno (3+)</option>
+            <option value="5">Quente (5+)</option>
+            <option value="7">Muito quente (7+)</option>
+          </select>
+        </label>
+        <label class="field field-inline"><span class="field-label">Mostrar</span>
+          <select id="status">
+            <option value="open">Por tratar</option>
+            <option value="saved">Guardados</option>
+            <option value="replied">Respondidos</option>
+            <option value="all">Tudo</option>
+          </select>
+        </label>
+        <label class="field field-inline"><span class="field-label">Auto</span>
+          <select id="auto">
+            <option value="0">Desligado</option>
+            <option value="10">10 min</option>
+            <option value="30">30 min</option>
+          </select>
+        </label>
+        <button type="button" class="btn btn-primary" id="run">Procurar agora</button>
+      </div>
+      <ul class="cv-sources" id="sources" aria-label="Estado das fontes"></ul>
+    </section>
+
+    <section id="feed" class="cv-feed" aria-live="polite" aria-busy="false">
+      <div class="cv-empty" id="empty">
+        <p><b>Ainda não procurámos.</b> Carrega em «Procurar agora».</p>
+      </div>
+      <ol class="cv-list" id="list"></ol>
+    </section>
+
+    <section class="cv-help">
+      <h2>Como responder sem parecer spam</h2>
+      <ol>
+        <li>Responde no próprio post, em público, com uma dica útil para o caso dele, e só depois oferece ajuda.</li>
+        <li>Mostra um exemplo do teu trabalho parecido com o negócio da pessoa.</li>
+        <li>Respeita as regras do grupo ou subreddit: muitos proíbem autopromoção.</li>
+      </ol>
+      <p class="cv-note">Fontes públicas, sem login nem chaves: Reddit, Bluesky, Lemmy, Mastodon e Hacker News.</p>
+    </section>
+  </main>
+
+  <template id="tpl">
+    <li class="cv-item">
+      <div class="cv-meta">
+        <span class="cv-score"></span>
+        <span class="cv-src"></span>
+        <span class="cv-where"></span>
+        <time class="cv-date"></time>
+        <span class="cv-new" hidden>Novo</span>
+      </div>
+      <h3 class="cv-title"></h3>
+      <p class="cv-text"></p>
+      <div class="cv-actions">
+        <a class="btn btn-primary btn-sm cv-open" target="_blank" rel="noopener noreferrer">Abrir post</a>
+        <button type="button" class="btn btn-quiet btn-sm cv-copy">Copiar resposta</button>
+        <button type="button" class="btn btn-quiet btn-sm cv-save">Guardar</button>
+        <button type="button" class="btn btn-quiet btn-sm cv-replied">Já respondi</button>
+        <button type="button" class="btn btn-quiet btn-sm cv-hide">Ignorar</button>
+      </div>
+    </li>
+  </template>
+
+  <script type="module" src="assets/js/conversas.js"></script>
+</body>
+</html>
