@@ -68,3 +68,17 @@ test("só redes conta como sem site; fechados excluídos", () => {
   assert.equal(toFunnelLead({ ...l, phones: [{ e164: "+351800123456" }] }), null);
   assert.equal(toFunnelLead({ ...l, site: "real", hasWebsite: true }), null);
 });
+
+test("sessão assinada: válida entre instâncias, adulterada recusada", async () => {
+  process.env.SESSION_SECRET = "x".repeat(32);
+  const { createSession, sessionUser } = await import("../server/auth.mjs");
+  const user = { id: 1, username: "dono", nome: "Dono", role: "dono" };
+  const fakeDb = { one: async (sql, [v]) => (v === 1 || v === "dono" ? (sql.includes("role") ? user : { username: "dono" }) : null) };
+  const t = await createSession(fakeDb, 1);
+  assert.deepEqual(await sessionUser(fakeDb, t), user);
+  const [d] = t.split(".");
+  const forged = Buffer.from(JSON.stringify({ u: "dono", e: Date.now() + 1e9 })).toString("base64url") + "." + t.split(".")[1];
+  assert.equal(await sessionUser(fakeDb, forged), null);
+  assert.equal(await sessionUser(fakeDb, d + ".abc"), null);
+  delete process.env.SESSION_SECRET;
+});
