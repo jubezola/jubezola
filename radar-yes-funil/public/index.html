@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Funil y.e.s — prospeção de negócios sem site</title>
+  <meta name="description" content="Funil de prospeção: empresas sem site encontradas, mensagens escritas, envios 1:1 e respostas.">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#070D1F">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/funil.css">
+  <link rel="modulepreload" href="assets/js/funil/api.js">
+  <link rel="modulepreload" href="assets/js/funil/ui.js">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-wa" viewBox="0 0 24 24"><path d="M3.5 20.5l1.3-3.9A8.5 8.5 0 1 1 8 19.4l-4.5 1.1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M9.2 7.9c-.3-.6-.6-.6-.9-.6h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4s1 2.8 1.2 3c.1.2 2 3.2 5 4.4 2.5 1 3 .8 3.5.7.6-.1 1.7-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.4l-2-1c-.3-.1-.5-.1-.7.1l-.9 1.1c-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.4.1-.6l.4-.5.3-.5c.1-.2 0-.4 0-.5l-.9-2.3z" fill="currentColor"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+      <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+      <symbol id="i-ban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="i-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+    </defs>
+  </svg>
+
+  <a class="skip" href="#leads">Saltar para os leads</a>
+
+  <!-- Login -->
+  <main id="login" class="login" hidden>
+    <form class="login-card" id="loginForm" novalidate>
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Funil <b>y.e.s</b></span></div>
+      <h1>Entrar</h1>
+      <p class="muted">Acesso reservado à equipa.</p>
+      <label class="field"><span>Utilizador</span><input name="username" autocomplete="username" required maxlength="40"></label>
+      <label class="field"><span>Palavra-passe</span><input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
+      <p class="form-error" id="loginError" role="alert"></p>
+      <button class="btn btn-accent btn-block" type="submit">Entrar</button>
+    </form>
+  </main>
+
+  <!-- App -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>Funil <b>y.e.s</b></span></div>
+      <div class="topbar-right">
+        <span class="quota" id="quota" title="Envios hoje / limite diário"></span>
+        <span class="who" id="who"></span>
+        <button class="icon-btn" id="openSettings" type="button" aria-label="Definições da equipa" hidden><svg class="ic"><use href="#i-sliders"/></svg></button>
+        <button class="icon-btn" id="logout" type="button" aria-label="Sair"><svg class="ic"><use href="#i-out"/></svg></button>
+      </div>
+    </header>
+
+    <p class="temp-banner" id="tempBanner" role="note" hidden>Modo temporário: ainda não há base de dados ligada, por isso os leads podem perder-se quando o servidor reinicia. Liga um Postgres (Neon) ao projeto para os guardar.</p>
+    <main class="wrap">
+      <section class="funnel" id="funnel" aria-labelledby="funnelTitle" data-running="false">
+        <div class="funnel-head">
+          <div>
+            <h1 id="funnelTitle" class="eyebrow">Funil de prospeção</h1>
+            <p class="funnel-sub" id="campaignInfo">Escolhe um nicho e uma região para começar.</p>
+          </div>
+          <div class="start-wrap">
+            <button type="button" class="pill" id="startBtn" data-state="idle"><span class="pill-dot" aria-hidden="true"></span><span id="startLabel">Começar</span></button>
+            <button type="button" class="btn btn-ghost btn-sm" id="cancelBtn" hidden>Cancelar</button>
+          </div>
+        </div>
+
+        <div class="chips" role="group" aria-label="Parâmetros da pesquisa">
+          <label class="chip"><span class="chip-k">Nicho</span><select id="nicho"></select></label>
+          <label class="chip"><span class="chip-k">Região</span><select id="regiao"></select></label>
+          <label class="chip"><span class="chip-k">Concelho</span><select id="concelho"><option value="">Todos</option></select></label>
+          <label class="chip chip-right"><span class="chip-k">Campanha</span><select id="campanha"><option value="ultima">Última</option><option value="todas">Todas</option></select></label>
+          <label class="chip" id="pessoaWrap" hidden><span class="chip-k">Pessoa</span><select id="pessoa"><option value="">Equipa</option></select></label>
+        </div>
+
+        <ol class="steps" id="steps" style="--fill:0">
+          <li class="step" data-step="encontrada">
+            <span class="node" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <button type="button" class="step-row" aria-pressed="false" data-filter="encontrada">
+              <span class="step-text"><span class="step-label">Encontradas</span><span class="step-sub">empresas sem site</span></span>
+              <span class="step-num" data-count="encontradas">0</span>
+            </button>
+            <p class="step-note" id="noteFound"></p>
+          </li>
+          <li class="conv" aria-hidden="true" data-conv="escritas"></li>
+          <li class="step" data-step="escrita">
+            <span class="node" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <button type="button" class="step-row" aria-pressed="false" data-filter="escrita">
+              <span class="step-text"><span class="step-label">Escritas</span><span class="step-sub">uma mensagem por empresa</span></span>
+              <span class="step-num" data-count="escritas">0</span>
+            </button>
+            <p class="step-note" id="noteWrite"></p>
+          </li>
+          <li class="conv" aria-hidden="true" data-conv="enviadas"></li>
+          <li class="step" data-step="enviada">
+            <span class="node" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <button type="button" class="step-row" aria-pressed="false" data-filter="enviada">
+              <span class="step-text"><span class="step-label">Enviadas</span><span class="step-sub">WhatsApp ou chamada</span></span>
+              <span class="step-num" data-count="enviadas">0</span>
+            </button>
+            <p class="step-note" id="noteSend"></p>
+          </li>
+          <li class="conv" aria-hidden="true" data-conv="respostas"></li>
+          <li class="step" data-step="respondida">
+            <span class="node" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <button type="button" class="step-row" aria-pressed="false" data-filter="respondida">
+              <span class="step-text"><span class="step-label">Respostas</span><span class="step-sub" id="rateSub">taxa de resposta —</span></span>
+              <span class="step-num" data-count="respostas">0</span>
+            </button>
+            <p class="step-note" id="noteReply"></p>
+          </li>
+        </ol>
+        <p class="sr-only" id="announcer" aria-live="polite"></p>
+
+        <div class="funnel-foot">
+          <button type="button" class="btn btn-accent" id="sprintBtn"><svg class="ic"><use href="#i-bolt"/></svg><span>Modo Sprint</span><span class="count" id="sprintCount">0</span></button>
+          <button type="button" class="btn btn-ghost" id="followBtn" hidden><svg class="ic"><use href="#i-clock"/></svg><span>Follow-up</span><span class="count" id="followCount">0</span></button>
+          <span class="meetings" id="meetings"></span>
+        </div>
+      </section>
+
+      <section class="leads" id="leads" aria-labelledby="leadsTitle" tabindex="-1">
+        <div class="leads-head">
+          <h2 id="leadsTitle">Leads <span class="muted" id="leadsTotal"></span></h2>
+          <div class="filters" role="group" aria-label="Filtros">
+            <label class="search"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">Procurar por nome</span><input id="fNome" type="search" placeholder="Procurar nome" maxlength="80" autocomplete="off"></label>
+            <label class="sel"><span class="sr-only">Etapa</span><select id="fEtapa"><option value="">Todas as etapas</option><option value="encontrada">Por escrever</option><option value="escrita">Por enviar</option><option value="enviada">Enviadas sem resposta</option><option value="respondida">Respondidas</option></select></label>
+            <label class="sel"><span class="sr-only">Telefone</span><select id="fTipo"><option value="">Todos os telefones</option><option value="movel">WhatsApp (móvel)</option><option value="fixo">Fixo</option></select></label>
+            <label class="sel"><span class="sr-only">Resultado</span><select id="fResultado"><option value="">Qualquer resultado</option><option value="interessado">Interessado</option><option value="reuniao">Reunião marcada</option><option value="sem_interesse">Sem interesse</option></select></label>
+          </div>
+        </div>
+        <div class="list" id="list" aria-busy="false"></div>
+        <div class="more"><button type="button" class="btn btn-ghost" id="moreBtn" hidden>Mostrar mais</button></div>
+      </section>
+    </main>
+    <footer class="foot"><a href="classico.html">Abrir o LeadRadar clássico (mapa)</a></footer>
+  </div>
+
+  <!-- Modo Sprint -->
+  <dialog class="sprint" id="sprint" aria-labelledby="sprintTitle">
+    <div class="sprint-in">
+      <div class="sprint-top">
+        <h2 id="sprintTitle" class="eyebrow">Modo Sprint</h2>
+        <span class="muted" id="sprintPos"></span>
+        <button class="icon-btn" type="button" id="sprintClose" aria-label="Fechar o Modo Sprint"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="sprint-body" id="sprintBody"></div>
+      <p class="kbd-hint" id="kbdHint"><kbd>Enter</kbd> abrir · <kbd>S</kbd> marcar enviado · <kbd>N</kbd> saltar · <kbd>Esc</kbd> sair</p>
+    </div>
+  </dialog>
+
+  <!-- Definições (dono) -->
+  <dialog class="modal" id="settings" aria-labelledby="settingsTitle">
+    <form method="dialog" class="modal-in" id="settingsForm" novalidate>
+      <h2 id="settingsTitle">Definições da equipa</h2>
+      <label class="field"><span>Limite diário de envios por pessoa</span><input name="limite_diario" type="number" min="1" max="500" required inputmode="numeric"></label>
+      <label class="field"><span>Dias até ao follow-up</span><input name="dias_followup" type="number" min="1" max="60" required inputmode="numeric"></label>
+      <label class="field"><span>Assinatura <small class="muted">({remetente} = nome de quem envia)</small></span><input name="assinatura" maxlength="60" required></label>
+      <p class="form-error" id="settingsError" role="alert"></p>
+      <div class="modal-actions"><button class="btn btn-ghost" value="cancel" formnovalidate>Cancelar</button><button class="btn btn-accent" id="saveSettings" value="save">Guardar</button></div>
+    </form>
+  </dialog>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <script type="module" src="assets/js/funil/ui.js"></script>
+</body>
+</html>
